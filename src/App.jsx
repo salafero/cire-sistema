@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -49,6 +49,18 @@ const CSS = `
   .item-cat:hover{background:rgba(255,255,255,0.04);}
   .item-cat.selected{background:rgba(39,33,232,0.12);border-color:rgba(39,33,232,0.3);}
 `;
+
+// ─── CSS INJECTOR (monta una sola vez en <head>) ────────────────────────────
+let cssInjected = false;
+function useCSSInjection() {
+  useEffect(() => {
+    if (cssInjected) return;
+    const style = document.createElement("style");
+    style.textContent = CSS;
+    document.head.appendChild(style);
+    cssInjected = true;
+  }, []);
+}
 
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────
 const USUARIOS = [
@@ -222,6 +234,9 @@ function AgendaCalendar({ session }) {
   const [citaCompletada,setCitaCompletada]=useState(null);
   const [horaSig,setHoraSig]=useState("");
   const [fechaSig,setFechaSig]=useState("");
+  // Ref para evitar que modalSig se abra fuera de contexto
+  const mountedRef=useRef(true);
+  useEffect(()=>{mountedRef.current=true;return()=>{mountedRef.current=false;};},[]);
 
   const cargarCitas=async()=>{
     const {data}=await supabase.from("citas").select("*")
@@ -262,9 +277,9 @@ function AgendaCalendar({ session }) {
     await supabase.from("citas").update({estado:"completada"}).eq("id",cita.id);
     setDetalle(null);
     // Proponer agendar siguiente sesión si tiene paquete activo
-    if(cita.paquete_id){
+    if(cita.paquete_id&&mountedRef.current){
       const{data:paq}=await supabase.from("paquetes").select("*").eq("id",cita.paquete_id).single();
-      if(paq&&paq.activo){
+      if(paq&&paq.activo&&mountedRef.current){
         // Fecha sugerida: 1 mes después
         const base=new Date(cita.fecha+"T12:00:00");
         base.setMonth(base.getMonth()+1);
@@ -274,7 +289,7 @@ function AgendaCalendar({ session }) {
         setModalSig(true);
       }
     }
-    cargarCitas();
+    if(mountedRef.current) cargarCitas();
   };
 
   const agendarSiguiente=async()=>{
@@ -639,7 +654,7 @@ function ModalFichaClienta({ ticket, onClose, session }) {
   };
 
   if(saved) return(
-    <div className="overlay">
+    <div className="overlay" style={{zIndex:300}}>
       <div className="glass" style={{width:400,padding:"40px",textAlign:"center",borderColor:"rgba(16,185,129,0.3)"}}>
         <div style={{fontSize:"48px",marginBottom:"12px"}}>✅</div>
         <div style={{fontSize:"18px",fontWeight:700,marginBottom:"6px"}}>¡Ficha creada!</div>
@@ -649,7 +664,7 @@ function ModalFichaClienta({ ticket, onClose, session }) {
   );
 
   return(
-    <div className="overlay">
+    <div className="overlay" style={{zIndex:300}}>
       <div className="glass" style={{width:460,padding:"28px",borderColor:"rgba(39,33,232,0.3)"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"20px"}}>
           <div>
@@ -701,6 +716,7 @@ function ModalFichaClienta({ ticket, onClose, session }) {
 // POS COMPONENT — grid de tarjetas + ficha clienta
 // ══════════════════════════════════════════════════════════════════════════════
 function POS({ session, onSwitchSucursal, isAdmin }) {
+  useCSSInjection();
   const [view,setView]             = useState("pos");
   const [carrito,setCarrito]       = useState([]);
   const [filtro,setFiltro]         = useState("Todos");
@@ -754,7 +770,7 @@ function POS({ session, onSwitchSucursal, isAdmin }) {
           }
         }
         // Si es nueva clienta → mostrar ficha
-        if(tipoClienta==="Nueva") setTicketNuevo(data[0]);
+        if(tipoClienta==="Nueva") setTicketNuevo({...data[0], servicios: carrito.map(i=>i.nombre)});
       }
       setCarrito([]);setMetodo("");setMsiSel(0);setDescuento(0);setTipoClienta("Nueva");setShowConfirm(false);
     }catch(e){console.error(e);}
@@ -798,7 +814,7 @@ function POS({ session, onSwitchSucursal, isAdmin }) {
       </div>
 
       {/* Vista Agenda */}
-      {view==="agenda"&&<AgendaCalendar session={session}/>}
+      {view==="agenda"&&<AgendaCalendar key="agenda" session={session}/>}
 
       {/* Vista Historial */}
       {view==="historial"&&(
@@ -1000,6 +1016,7 @@ function POS({ session, onSwitchSucursal, isAdmin }) {
 // DASHBOARD COMPONENT
 // ══════════════════════════════════════════════════════════════════════════════
 function Dashboard({ onVerPOS, onLogout }) {
+  useCSSInjection();
   const [tab,setTab]             = useState("resumen");
   const [tickets,setTickets]     = useState([]);
   const [loadingDB,setLoadingDB] = useState(false);
@@ -1302,6 +1319,7 @@ function Dashboard({ onVerPOS, onLogout }) {
 // APP ROOT — LOGIN UNIFICADO
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
+  useCSSInjection();
   const [session,setSession] = useState(null);
   const [user,setUser]       = useState("");
   const [pass,setPass]       = useState("");
@@ -1315,7 +1333,6 @@ export default function App() {
 
   if(!session) return (
     <div style={{minHeight:"100vh",background:"#0C0D1A",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Albert Sans',sans-serif",position:"relative",overflow:"hidden"}}>
-      <style>{CSS}</style>
       <div style={{position:"absolute",width:500,height:500,borderRadius:"50%",background:"#2721E8",opacity:0.08,filter:"blur(100px)",top:"-150px",left:"-150px",pointerEvents:"none"}}/>
       <div style={{position:"absolute",width:400,height:400,borderRadius:"50%",background:"#49B8D3",opacity:0.06,filter:"blur(80px)",bottom:"0px",right:"0px",pointerEvents:"none"}}/>
       <div className="glass" style={{width:420,padding:"52px 44px",position:"relative"}}>
@@ -1336,16 +1353,10 @@ export default function App() {
   );
 
   if(session.rol==="admin") return (
-    <>
-      <style>{CSS}</style>
-      <Dashboard onLogout={()=>setSession(null)}/>
-    </>
+    <Dashboard onLogout={()=>setSession(null)}/>
   );
 
   return (
-    <>
-      <style>{CSS}</style>
-      <POS session={session} onSwitchSucursal={()=>setSession(null)} isAdmin={false}/>
-    </>
+    <POS session={session} onSwitchSucursal={()=>setSession(null)} isAdmin={false}/>
   );
 }
