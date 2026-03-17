@@ -93,86 +93,45 @@ const CATALOGO = [
 const TIPOS_SVC = [
   { id:"laser",       label:"Láser",          duracion:60, color:"#2721E8" },
   { id:"facial_baby", label:"Baby Clean",      duracion:60, color:"#49B8D3" },
-  { id:"facial_full", label:"FullFace",        duracion:90, color:"#49B8D3" },
-  { id:"corporal",    label:"Corporal/Moldeo", duracion:60, color:"#a855f7" },
-  { id:"hifu",        label:"HIFU 4D",         duracion:90, color:"#f97316" },
-  { id:"post_op",     label:"Post operatorio", duracion:60, color:"#10b981" },
-];
-const HORARIOS = {1:{a:"10:00",c:"20:00"},2:{a:"10:00",c:"20:00"},3:{a:"10:00",c:"20:00"},4:{a:"10:00",c:"20:00"},5:{a:"10:00",c:"20:00"},6:{a:"09:00",c:"16:00"},0:null};
-const DIAS_L   = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-
-function generarBloques(fecha, dur) {
-  const dow=new Date(fecha+"T12:00:00").getDay(), h=HORARIOS[dow];
-  if(!h) return [];
-  const bl=[], [hA,mA]=h.a.split(":").map(Number), [hC,mC]=h.c.split(":").map(Number);
-  let m=hA*60+mA; const fin=hC*60+mC;
-  while(m+dur<=fin){
-    const hh=Math.floor(m/60),mm=m%60,hf=Math.floor((m+dur)/60),mf=(m+dur)%60;
-    bl.push({ini:`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`,fin:`${String(hf).padStart(2,"0")}:${String(mf).padStart(2,"0")}`});
-    m+=30;
-  }
-  return bl;
-}
-function semanaD(fecha){
-  const base=new Date(fecha+"T12:00:00"),dow=base.getDay(),l=new Date(base);
-  l.setDate(base.getDate()-(dow===0?6:dow-1));
-  return Array.from({length:6},(_,i)=>{const d=new Date(l);d.setDate(l.getDate()+i);return d.toISOString().slice(0,10);});
-}
-const lFecha=(f)=>new Date(f+"T12:00:00").toLocaleDateString("es-MX",{weekday:"short",day:"numeric",month:"short"});
-const colorT=(t)=>TIPOS_SVC.find(x=>x.id===t)?.color||"#2721E8";
-
-// ─── CSS GLOBAL ───────────────────────────────────────────────────────────────
-const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Albert+Sans:wght@300;400;500;600;700&display=swap');
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{background:#0C0D1A;font-family:'Albert Sans',sans-serif;}
-  ::-webkit-scrollbar{width:4px;height:4px;background:transparent;}
-  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:2px;}
-  .glass{background:rgba(255,255,255,0.04);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-radius:16px;}
-  .glass-dark{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:12px;}
-  .kpi{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;}
-  .kpi.hi{border-color:rgba(39,33,232,0.5);background:rgba(39,33,232,0.08);}
-  .kpi.green{border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.06);}
-  .kpi.orange{border-color:rgba(249,115,22,0.4);background:rgba(249,115,22,0.06);}
-  .inp{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;color:#fff;font-family:'Albert Sans',sans-serif;font-size:13px;width:100%;outline:none;transition:border 0.2s;}
-  .inp:focus{border-color:#2721E8;}
-  .inp::placeholder{color:rgba(255,255,255,0.2);}
-  .btn-blue{background:#2721E8;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-family:'Albert Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;}
-  .btn-blue:hover{background:#3d38f0;}
-  .btn-blue:disabled{background:rgba(39,33,232,0.3);cursor:default;}
-  .btn-ghost{background:transparent;color:rgba(255,255,255,0.5);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:8px 16px;font-family:'Albert Sans',sans-serif;font-size:12px;cursor:pointer;transition:all 0.2s;}
-  .btn-ghost:hover{border-color:#2721E8;color:#fff;}
-  .nav-tab{padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:rgba(255,255,255,0.35);transition:all 0.18s;}
-  .nav-tab.active{color:#fff;border-bottom-color:#2721E8;}
-  .nav-tab:hover{color:rgba(255,255,255,0.7);}
-  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;}
-  .tab-dash{padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:rgba(255,255,255,0.35);transition:all 0.18s;}
-  .tab-dash.active{color:#fff;border-bottom-color:#2721E8;}
-  .tab-dash:hover{color:rgba(255,255,255,0.7);}
-  .rank-row{display:grid;grid-template-columns:32px 110px 1fr 110px 110px 100px;gap:0;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;}
-  .rank-row:hover{background:rgba(255,255,255,0.02);}
-  .cita-card{border-radius:8px;padding:8px 10px;margin-bottom:4px;cursor:pointer;transition:opacity 0.15s;border-left:3px solid;}
-  .cita-card:hover{opacity:0.8;}
-  .bloque-btn{padding:8px 6px;border-radius:8px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid;transition:all 0.15s;text-align:center;}
-  .clienta-sugg{padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.15s;}
-  .clienta-sugg:hover{background:rgba(39,33,232,0.2);}
-  .paq-card{padding:12px;border-radius:10px;border:1px solid;cursor:pointer;transition:all 0.15s;margin-bottom:8px;}
-  .paq-card:hover{border-color:#2721E8;}
-  .tipo-btn{padding:10px 14px;border-radius:10px;border:1px solid;cursor:pointer;transition:all 0.15s;text-align:center;}
-  .paso-ind{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
-  .item-cat{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;cursor:pointer;transition:background 0.15s;border:1px solid transparent;}
-  .item-cat:hover{background:rgba(255,255,255,0.04);}
-  .item-cat.selected{background:rgba(39,33,232,0.12);border-color:rgba(39,33,232,0.3);}
-`;
-
 // ══════════════════════════════════════════════════════════════════════════════
-// AGENDA COMPONENT
+// POS COMPONENT — con grid visual, ficha clienta, agenda Google Calendar style
 // ══════════════════════════════════════════════════════════════════════════════
-function Agenda({ session }) {
-  const [semana,setSemana]=useState(semanaD(hoy()));
-  const [citas,setCitas]=useState([]);
-  const [modal,setModal]=useState(false);
-  const [detalle,setDetalle]=useState(null);
+
+// Categorías para filtros rápidos
+const FILTROS = ["Todos","Combos","Rostro","Superior","Inferior","Bikini","Faciales","Corporales"];
+const CAT_MAP = {
+  "Combos":     "Combos Láser",
+  "Rostro":     "Facial Láser",
+  "Superior":   "Zonas Individuales",
+  "Inferior":   "Zonas Individuales",
+  "Bikini":     "Facial Láser",
+  "Faciales":   "Faciales",
+  "Corporales": "Corporal",
+};
+const ITEM_FILTRO = (item, filtro) => {
+  if(filtro==="Todos") return true;
+  if(filtro==="Combos") return item.nombre.toLowerCase().includes("combo") || item.nombre.toLowerCase().includes("full body");
+  if(filtro==="Rostro") return item.nombre.toLowerCase().includes("rostro") || item.nombre.toLowerCase().includes("bigote") || item.nombre.toLowerCase().includes("medio rostro") || item.nombre.toLowerCase().includes("patillas");
+  if(filtro==="Superior") return ["axilas","brazos","pecho","abdomen","espalda","línea abdomen","glúteos","zona interg"].some(k=>item.nombre.toLowerCase().includes(k));
+  if(filtro==="Inferior") return ["piernas","medias piernas"].some(k=>item.nombre.toLowerCase().includes(k));
+  if(filtro==="Bikini") return ["bikini","french","sexy bikini"].some(k=>item.nombre.toLowerCase().includes(k));
+  if(filtro==="Faciales") return item.nombre.toLowerCase().includes("baby clean") || item.nombre.toLowerCase().includes("fullface") || item.nombre.toLowerCase().includes("hifu");
+  if(filtro==="Corporales") return ["moldeo","anticel","post op","aparatolog"].some(k=>item.nombre.toLowerCase().includes(k));
+  return true;
+};
+
+const COMO_NOS_CONOCIO = ["Facebook","Instagram","TikTok","Recomendación","Google","Pasé por aquí","Otro"];
+
+// ─── Agenda estilo Google Calendar ───────────────────────────────────────────
+const HORAS = Array.from({length:12},(_,i)=>i+9); // 9am a 8pm
+function AgendaCalendar({ session }) {
+  const [semana,setSemana]   = useState(semanaD(hoy()));
+  const [citas,setCitas]     = useState([]);
+  const [modal,setModal]     = useState(false);
+  const [detalle,setDetalle] = useState(null);
+  const [fechaSel,setFechaSel]=useState(null);
+  const [horaSel,setHoraSel] =useState(null);
+  // Form nueva cita
   const [busqueda,setBusqueda]=useState("");
   const [clientasEnc,setClientasEnc]=useState([]);
   const [clientaSel,setClientaSel]=useState(null);
@@ -181,38 +140,41 @@ function Agenda({ session }) {
   const [tipoSvc,setTipoSvc]=useState(null);
   const [fechaCita,setFechaCita]=useState(hoy());
   const [bloqueSel,setBloqueSel]=useState(null);
-  const [bloques,setBloques]=useState([]);
   const [notas,setNotas]=useState("");
   const [esNueva,setEsNueva]=useState(true);
   const [nombreN,setNombreN]=useState("");
   const [telN,setTelN]=useState("");
   const [saving,setSaving]=useState(false);
   const [paso,setPaso]=useState(1);
+  // Modal siguiente sesión
+  const [modalSig,setModalSig]=useState(false);
+  const [citaCompletada,setCitaCompletada]=useState(null);
+  const [horaSig,setHoraSig]=useState("");
+  const [fechaSig,setFechaSig]=useState("");
 
   const cargarCitas=async()=>{
-    const {data}=await supabase.from("citas").select("*").eq("sucursal_id",session.id).gte("fecha",semana[0]).lte("fecha",semana[5]).order("hora_inicio");
+    const {data}=await supabase.from("citas").select("*")
+      .eq("sucursal_id",session.id)
+      .gte("fecha",semana[0]).lte("fecha",semana[5])
+      .order("hora_inicio");
     if(data) setCitas(data);
   };
   useEffect(()=>{cargarCitas();},[semana,session]);
-  useEffect(()=>{if(tipoSvc&&fechaCita){setBloques(generarBloques(fechaCita,tipoSvc.duracion));setBloqueSel(null);}},[tipoSvc,fechaCita]);
 
-  const buscarC=async(q)=>{if(q.length<2){setClientasEnc([]);return;}const{data}=await supabase.from("clientas").select("*").ilike("nombre",`%${q}%`).eq("sucursal_id",session.id).limit(5);setClientasEnc(data||[]);};
+  const buscarC=async(q)=>{if(q.length<2){setClientasEnc([]);return;}const{data}=await supabase.from("clientas").select("*").ilike("nombre",`%${q}%`).eq("sucursal_id",session.id).limit(6);setClientasEnc(data||[]);};
   const selC=async(c)=>{setClientaSel(c);setClientasEnc([]);setBusqueda(c.nombre);setEsNueva(false);const{data}=await supabase.from("paquetes").select("*").eq("clienta_id",c.id).eq("activo",true);setPaquetesSel(data||[]);setPaqElegido(null);};
   const selPaq=(p)=>{
     setPaqElegido(p);
     const n=p.servicio.toLowerCase();
     let t=TIPOS_SVC[0];
-    if(n.includes("baby"))t=TIPOS_SVC[1];
-    else if(n.includes("fullface")||n.includes("facial"))t=TIPOS_SVC[2];
-    else if(n.includes("hifu"))t=TIPOS_SVC[4];
-    else if(n.includes("post"))t=TIPOS_SVC[5];
+    if(n.includes("baby"))t=TIPOS_SVC[1];else if(n.includes("fullface")||n.includes("facial"))t=TIPOS_SVC[2];
+    else if(n.includes("hifu"))t=TIPOS_SVC[4];else if(n.includes("post"))t=TIPOS_SVC[5];
     else if(n.includes("moldeo")||n.includes("corporal")||n.includes("anticel"))t=TIPOS_SVC[3];
     setTipoSvc(t);
   };
-  const ocupado=(b)=>citas.filter(c=>c.fecha===fechaCita).some(c=>(b.ini>=c.hora_inicio&&b.ini<c.hora_fin)||(b.fin>c.hora_inicio&&b.fin<=c.hora_fin));
 
   const guardarCita=async()=>{
-    if(!bloqueSel)return; setSaving(true);
+    if(!bloqueSel)return;setSaving(true);
     try{
       let cId=clientaSel?.id,cNom=clientaSel?.nombre;
       if(esNueva&&!clientaSel){const{data:nc}=await supabase.from("clientas").insert([{nombre:nombreN,telefono:telN,sucursal_id:session.id,sucursal_nombre:session.nombre}]).select();cId=nc[0].id;cNom=nc[0].nombre;}
@@ -224,75 +186,184 @@ function Agenda({ session }) {
     }catch(e){console.error(e);}
     setSaving(false);
   };
-  const marcarOk=async(id)=>{await supabase.from("citas").update({estado:"completada"}).eq("id",id);cargarCitas();};
-  const cancelC=async(id,pId,sU)=>{await supabase.from("citas").update({estado:"cancelada"}).eq("id",id);if(pId)await supabase.from("paquetes").update({sesiones_usadas:Math.max(0,sU-1),activo:true}).eq("id",pId);setDetalle(null);cargarCitas();};
-  const resetM=()=>{setModal(false);setPaso(1);setBusqueda("");setClientaSel(null);setClientasEnc([]);setPaquetesSel([]);setPaqElegido(null);setTipoSvc(null);setFechaCita(hoy());setBloqueSel(null);setBloques([]);setNotas("");setEsNueva(true);setNombreN("");setTelN("");};
+
+  const marcarCompletada=async(cita)=>{
+    await supabase.from("citas").update({estado:"completada"}).eq("id",cita.id);
+    setDetalle(null);
+    // Proponer agendar siguiente sesión si tiene paquete activo
+    if(cita.paquete_id){
+      const{data:paq}=await supabase.from("paquetes").select("*").eq("id",cita.paquete_id).single();
+      if(paq&&paq.activo){
+        // Fecha sugerida: 1 mes después
+        const base=new Date(cita.fecha+"T12:00:00");
+        base.setMonth(base.getMonth()+1);
+        setFechaSig(base.toISOString().slice(0,10));
+        setHoraSig(cita.hora_inicio);
+        setCitaCompletada({...cita,paquete:paq});
+        setModalSig(true);
+      }
+    }
+    cargarCitas();
+  };
+
+  const agendarSiguiente=async()=>{
+    if(!fechaSig||!horaSig||!citaCompletada)return;setSaving(true);
+    try{
+      const dur=TIPOS_SVC.find(t=>t.id===citaCompletada.tipo_servicio)?.duracion||60;
+      const [h,m]=horaSig.split(":").map(Number);
+      const hf=Math.floor((h*60+m+dur)/60),mf=(h*60+m+dur)%60;
+      const horaFin=`${String(hf).padStart(2,"0")}:${String(mf).padStart(2,"0")}`;
+      const sNum=citaCompletada.sesion_numero+1;
+      await supabase.from("citas").insert([{
+        clienta_id:citaCompletada.clienta_id,clienta_nombre:citaCompletada.clienta_nombre,
+        paquete_id:citaCompletada.paquete_id,sucursal_id:session.id,sucursal_nombre:session.nombre,
+        servicio:citaCompletada.servicio,tipo_servicio:citaCompletada.tipo_servicio,duracion_min:dur,
+        fecha:fechaSig,hora_inicio:horaSig,hora_fin:horaFin,sesion_numero:sNum,
+        es_cobro:false,estado:"agendada",notas:"Auto-agendada tras sesión anterior",
+      }]);
+      setModalSig(false);setCitaCompletada(null);cargarCitas();
+    }catch(e){console.error(e);}
+    setSaving(false);
+  };
+
+  const cancelarCita=async(id,pId,sU)=>{
+    await supabase.from("citas").update({estado:"cancelada"}).eq("id",id);
+    if(pId)await supabase.from("paquetes").update({sesiones_usadas:Math.max(0,sU-1),activo:true}).eq("id",pId);
+    setDetalle(null);cargarCitas();
+  };
+
+  const resetM=()=>{setModal(false);setPaso(1);setBusqueda("");setClientaSel(null);setClientasEnc([]);setPaquetesSel([]);setPaqElegido(null);setTipoSvc(null);setFechaCita(hoy());setBloqueSel(null);setNotas("");setEsNueva(true);setNombreN("");setTelN("");};
   const semAnt=()=>{const d=new Date(semana[0]+"T12:00:00");d.setDate(d.getDate()-7);setSemana(semanaD(d.toISOString().slice(0,10)));};
   const semSig=()=>{const d=new Date(semana[0]+"T12:00:00");d.setDate(d.getDate()+7);setSemana(semanaD(d.toISOString().slice(0,10)));};
-  const citasDia=(f)=>citas.filter(c=>c.fecha===f).sort((a,b)=>a.hora_inicio.localeCompare(b.hora_inicio));
 
-  return (
-    <div style={{padding:"20px 24px",overflowY:"auto",height:"calc(100vh - 64px)"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"14px"}}>
-        <div>
-          <div style={{fontSize:"10px",letterSpacing:"2px",color:"rgba(255,255,255,0.3)",marginBottom:"2px"}}>AGENDA SEMANAL</div>
-          <div style={{fontSize:"15px",fontWeight:600}}>{session.nombre}</div>
-        </div>
-        <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
-          <button className="btn-ghost" onClick={semAnt}>← Anterior</button>
-          <div style={{fontSize:"11px",color:"rgba(255,255,255,0.4)",padding:"0 6px"}}>{lFecha(semana[0])} — {lFecha(semana[5])}</div>
-          <button className="btn-ghost" onClick={semSig}>Siguiente →</button>
-          <button className="btn-blue" onClick={()=>setModal(true)}>+ Nueva cita</button>
-        </div>
-      </div>
-      <div style={{display:"flex",gap:"10px",marginBottom:"12px",flexWrap:"wrap"}}>
-        {TIPOS_SVC.map(t=>(
-          <div key={t.id} style={{display:"flex",alignItems:"center",gap:"5px",fontSize:"10px",color:"rgba(255,255,255,0.35)"}}>
-            <div style={{width:"8px",height:"8px",borderRadius:"2px",background:t.color}}/>{t.label}
+  const citasEnBloque=(fecha,hora)=>{
+    const hStr=`${String(hora).padStart(2,"0")}:00`;
+    const hStrFin=`${String(hora+1).padStart(2,"0")}:00`;
+    return citas.filter(c=>c.fecha===fecha&&c.hora_inicio>=hStr&&c.hora_inicio<hStrFin&&c.estado!=="cancelada");
+  };
+
+  const abrirModalEnHora=(fecha,hora)=>{
+    setFechaCita(fecha);
+    const hStr=`${String(hora).padStart(2,"0")}:00`;
+    setBloqueSel({ini:hStr,fin:`${String(hora+1).padStart(2,"0")}:00`});
+    setModal(true);setPaso(1);
+  };
+
+  // Altura por bloque de 60min = 64px
+  const PX_POR_MIN=64/60;
+  const citasPorDia=(fecha)=>citas.filter(c=>c.fecha===fecha&&c.estado!=="cancelada");
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 64px)",background:"#0C0D1A",color:"#fff",fontFamily:"'Albert Sans',sans-serif"}}>
+      {/* Header calendario */}
+      <div style={{padding:"12px 20px",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+          <button className="btn-ghost" style={{padding:"6px 14px"}} onClick={()=>{setSemana(semanaD(hoy()));}}>Hoy</button>
+          <button onClick={semAnt} style={{background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"8px",color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"6px 10px",fontSize:"14px"}}>‹</button>
+          <button onClick={semSig} style={{background:"none",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"8px",color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"6px 10px",fontSize:"14px"}}>›</button>
+          <div style={{fontSize:"16px",fontWeight:600,textTransform:"capitalize"}}>
+            {new Date(semana[0]+"T12:00:00").toLocaleDateString("es-MX",{month:"long",year:"numeric"})}
           </div>
-        ))}
-        <div style={{display:"flex",alignItems:"center",gap:"5px",fontSize:"10px",color:"rgba(255,255,255,0.35)"}}>
-          <div style={{width:"8px",height:"8px",borderRadius:"2px",background:"#f0c040"}}/>💰 Cobro
+        </div>
+        <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+          {TIPOS_SVC.map(t=>(
+            <div key={t.id} style={{display:"flex",alignItems:"center",gap:"4px",fontSize:"10px",color:"rgba(255,255,255,0.35)"}}>
+              <div style={{width:"8px",height:"8px",borderRadius:"2px",background:t.color}}/>{t.label}
+            </div>
+          ))}
+          <button className="btn-blue" style={{marginLeft:"8px",padding:"7px 16px"}} onClick={()=>{setBloqueSel(null);setModal(true);setPaso(1);}}>+ Nueva cita</button>
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:"8px"}}>
-        {semana.map(fecha=>{
-          const dow=new Date(fecha+"T12:00:00").getDay(),ab=HORARIOS[dow]!==null,ef=fecha===hoy(),cd=citasDia(fecha);
-          return(
-            <div key={fecha} className="glass" style={{padding:"10px",minHeight:"200px",opacity:ab?1:0.35,borderColor:ef?"rgba(39,33,232,0.6)":"rgba(255,255,255,0.08)"}}>
-              <div style={{marginBottom:"8px"}}>
-                <div style={{fontSize:"9px",color:"rgba(255,255,255,0.3)",letterSpacing:"1px"}}>{DIAS_L[dow]}</div>
-                <div style={{fontSize:"15px",fontWeight:700,color:ef?"#49B8D3":"#fff"}}>{fecha.slice(8)}</div>
-                {!ab&&<div style={{fontSize:"9px",color:"rgba(255,80,80,0.5)"}}>Cerrado</div>}
-                {ab&&<div style={{fontSize:"8px",color:"rgba(255,255,255,0.2)"}}>{HORARIOS[dow].a}–{HORARIOS[dow].c}</div>}
-              </div>
-              {cd.length===0&&ab&&<div style={{fontSize:"10px",color:"rgba(255,255,255,0.12)",textAlign:"center",paddingTop:"16px"}}>Sin citas</div>}
-              {cd.map(c=>(
-                <div key={c.id} className="cita-card" style={{background:`${colorT(c.tipo_servicio)}15`,borderLeftColor:c.es_cobro?"#f0c040":colorT(c.tipo_servicio),opacity:c.estado==="cancelada"?0.35:1}} onClick={()=>setDetalle(c)}>
-                  <div style={{fontSize:"9px",color:"rgba(255,255,255,0.35)"}}>{c.hora_inicio}–{c.hora_fin}</div>
-                  <div style={{fontSize:"11px",fontWeight:600,lineHeight:1.2,marginTop:"1px"}}>{c.clienta_nombre}</div>
-                  <div style={{fontSize:"9px",color:colorT(c.tipo_servicio),marginTop:"1px"}}>{c.servicio}</div>
-                  <div style={{display:"flex",gap:"3px",marginTop:"3px",flexWrap:"wrap"}}>
-                    {c.es_cobro&&<span style={{fontSize:"8px",background:"rgba(240,192,64,0.2)",color:"#f0c040",padding:"1px 4px",borderRadius:"3px"}}>💰</span>}
-                    <span style={{fontSize:"8px",background:"rgba(255,255,255,0.06)",color:"rgba(255,255,255,0.35)",padding:"1px 4px",borderRadius:"3px"}}>S{c.sesion_numero}</span>
-                    {c.estado==="completada"&&<span style={{fontSize:"8px",background:"rgba(16,185,129,0.2)",color:"#10b981",padding:"1px 4px",borderRadius:"3px"}}>✓</span>}
-                    {c.estado==="cancelada"&&<span style={{fontSize:"8px",background:"rgba(255,80,80,0.2)",color:"#ff6b6b",padding:"1px 4px",borderRadius:"3px"}}>✗</span>}
-                  </div>
+
+      {/* Grid calendario */}
+      <div style={{flex:1,overflowY:"auto",overflowX:"hidden"}}>
+        {/* Cabecera días */}
+        <div style={{display:"grid",gridTemplateColumns:"52px repeat(6,1fr)",borderBottom:"1px solid rgba(255,255,255,0.08)",position:"sticky",top:0,background:"#0C0D1A",zIndex:10}}>
+          <div/>
+          {semana.map(fecha=>{
+            const dow=new Date(fecha+"T12:00:00").getDay();
+            const ef=fecha===hoy();
+            const abierto=HORARIOS[dow]!==null;
+            return(
+              <div key={fecha} style={{padding:"10px 8px",textAlign:"center",opacity:abierto?1:0.4}}>
+                <div style={{fontSize:"10px",color:"rgba(255,255,255,0.4)",letterSpacing:"1px",marginBottom:"4px"}}>{DIAS_L[dow].toUpperCase()}</div>
+                <div style={{width:"32px",height:"32px",borderRadius:"50%",background:ef?"#2721E8":"transparent",margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <span style={{fontSize:"16px",fontWeight:ef?700:400,color:ef?"#fff":"rgba(255,255,255,0.8)"}}>{fecha.slice(8)}</span>
                 </div>
-              ))}
-            </div>
-          );
-        })}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Cuerpo con horas */}
+        <div style={{display:"grid",gridTemplateColumns:"52px repeat(6,1fr)",position:"relative"}}>
+          {/* Columna horas */}
+          <div>
+            {HORAS.map(h=>(
+              <div key={h} style={{height:"64px",display:"flex",alignItems:"flex-start",justifyContent:"flex-end",paddingRight:"8px",paddingTop:"2px"}}>
+                <span style={{fontSize:"10px",color:"rgba(255,255,255,0.25)"}}>{h>12?`${h-12}pm`:h===12?"12pm":`${h}am`}</span>
+              </div>
+            ))}
+          </div>
+          {/* Columnas días */}
+          {semana.map(fecha=>{
+            const dow=new Date(fecha+"T12:00:00").getDay();
+            const abierto=HORARIOS[dow]!==null;
+            const cd=citasPorDia(fecha);
+            return(
+              <div key={fecha} style={{borderLeft:"1px solid rgba(255,255,255,0.05)",position:"relative",opacity:abierto?1:0.3}}>
+                {HORAS.map(h=>(
+                  <div key={h} style={{height:"64px",borderBottom:"1px solid rgba(255,255,255,0.04)",cursor:abierto?"pointer":"default",transition:"background 0.1s"}}
+                    onClick={()=>abierto&&abrirModalEnHora(fecha,h)}
+                    onMouseEnter={e=>{if(abierto)e.currentTarget.style.background="rgba(255,255,255,0.02)";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="transparent";}}
+                  />
+                ))}
+                {/* Eventos encima */}
+                {cd.map(c=>{
+                  const [ch,cm]=c.hora_inicio.split(":").map(Number);
+                  const top=(ch-9)*64+cm*PX_POR_MIN;
+                  const height=Math.max(c.duracion_min*PX_POR_MIN-2,20);
+                  const col=colorT(c.tipo_servicio);
+                  return(
+                    <div key={c.id} onClick={(e)=>{e.stopPropagation();setDetalle(c);}}
+                      style={{position:"absolute",left:"2px",right:"2px",top:`${top}px`,height:`${height}px`,background:`${col}22`,border:`1px solid ${col}66`,borderLeft:`3px solid ${c.es_cobro?"#f0c040":col}`,borderRadius:"6px",padding:"3px 6px",cursor:"pointer",overflow:"hidden",zIndex:5,transition:"opacity 0.15s"}}
+                      onMouseEnter={e=>e.currentTarget.style.opacity="0.85"}
+                      onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+                      <div style={{fontSize:"10px",fontWeight:700,color:col,lineHeight:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.hora_inicio} {c.clienta_nombre}</div>
+                      {height>30&&<div style={{fontSize:"9px",color:"rgba(255,255,255,0.5)",marginTop:"2px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.servicio}</div>}
+                      {height>44&&c.es_cobro&&<div style={{fontSize:"8px",color:"#f0c040",marginTop:"1px"}}>💰 Cobro</div>}
+                    </div>
+                  );
+                })}
+                {/* Línea hora actual */}
+                {fecha===hoy()&&(()=>{
+                  const now=new Date();
+                  const minsDesdelas9=(now.getHours()-9)*60+now.getMinutes();
+                  if(minsDesdelas9<0||minsDesdelas9>12*60)return null;
+                  return <div style={{position:"absolute",left:0,right:0,top:`${minsDesdelas9*PX_POR_MIN}px`,height:"2px",background:"#ff4444",zIndex:6,pointerEvents:"none"}}>
+                    <div style={{width:"8px",height:"8px",borderRadius:"50%",background:"#ff4444",position:"absolute",left:"-4px",top:"-3px"}}/>
+                  </div>;
+                })()}
+              </div>
+            );
+          })}
+        </div>
       </div>
+
+      {/* Modal detalle cita */}
       {detalle&&(
         <div className="overlay" onClick={()=>setDetalle(null)}>
-          <div className="glass" style={{width:360,padding:"26px",borderColor:`${colorT(detalle.tipo_servicio)}44`}} onClick={e=>e.stopPropagation()}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:"18px"}}>
-              <div><div style={{fontSize:"10px",letterSpacing:"2px",color:"rgba(255,255,255,0.3)",marginBottom:"3px"}}>CITA</div><div style={{fontSize:"17px",fontWeight:700}}>{detalle.clienta_nombre}</div></div>
-              <button onClick={()=>setDetalle(null)} style={{background:"none",border:"none",color:"rgba(255,255,255,0.4)",cursor:"pointer",fontSize:"20px"}}>×</button>
+          <div className="glass" style={{width:380,padding:"26px",borderColor:`${colorT(detalle.tipo_servicio)}44`}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:"16px"}}>
+              <div>
+                <div style={{fontSize:"10px",letterSpacing:"2px",color:"rgba(255,255,255,0.3)",marginBottom:"3px"}}>CITA</div>
+                <div style={{fontSize:"18px",fontWeight:700}}>{detalle.clienta_nombre}</div>
+              </div>
+              <button onClick={()=>setDetalle(null)} style={{background:"none",border:"none",color:"rgba(255,255,255,0.4)",cursor:"pointer",fontSize:"22px"}}>×</button>
             </div>
-            <div style={{display:"flex",flexDirection:"column",gap:"9px",background:"rgba(0,0,0,0.3)",borderRadius:"10px",padding:"13px",marginBottom:"16px"}}>
-              {[["Servicio",detalle.servicio],["Fecha",new Date(detalle.fecha+"T12:00:00").toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"})],["Horario",`${detalle.hora_inicio} – ${detalle.hora_fin}`],["Sesión",`${detalle.sesion_numero} de 8`]].map(([l,v])=>(
+            <div style={{display:"flex",flexDirection:"column",gap:"9px",background:"rgba(0,0,0,0.3)",borderRadius:"10px",padding:"14px",marginBottom:"16px"}}>
+              {[["Servicio",detalle.servicio],["Fecha",new Date(detalle.fecha+"T12:00:00").toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"})],["Horario",`${detalle.hora_inicio} – ${detalle.hora_fin}`],["Sesión",`${detalle.sesion_numero} de 8`],["Sucursal",detalle.sucursal_nombre]].map(([l,v])=>(
                 <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:"13px"}}><span style={{color:"rgba(255,255,255,0.4)"}}>{l}</span><span style={{fontWeight:500}}>{v}</span></div>
               ))}
               <div style={{display:"flex",justifyContent:"space-between",fontSize:"13px"}}>
@@ -302,17 +373,50 @@ function Agenda({ session }) {
               {detalle.notas&&<div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",borderTop:"1px solid rgba(255,255,255,0.06)",paddingTop:"8px"}}>{detalle.notas}</div>}
             </div>
             {detalle.estado==="agendada"&&(<div style={{display:"flex",gap:"8px"}}>
-              <button className="btn-ghost" style={{flex:1,color:"#ff6b6b",borderColor:"rgba(255,80,80,0.3)"}} onClick={()=>cancelC(detalle.id,detalle.paquete_id,detalle.sesion_numero)}>Cancelar</button>
-              <button className="btn-blue" style={{flex:2}} onClick={()=>{marcarOk(detalle.id);setDetalle(null);}}>✓ Completada</button>
+              <button className="btn-ghost" style={{flex:1,color:"#ff6b6b",borderColor:"rgba(255,80,80,0.3)"}} onClick={()=>cancelarCita(detalle.id,detalle.paquete_id,detalle.sesion_numero)}>Cancelar</button>
+              <button className="btn-blue" style={{flex:2}} onClick={()=>marcarCompletada(detalle)}>✓ Completada</button>
             </div>)}
-            {detalle.estado!=="agendada"&&<div style={{textAlign:"center",fontSize:"13px",color:"rgba(255,255,255,0.3)"}}>Cita {detalle.estado}</div>}
+            {detalle.estado==="completada"&&<div style={{textAlign:"center",fontSize:"13px",color:"#10b981",fontWeight:600}}>✓ Sesión completada</div>}
+            {detalle.estado==="cancelada"&&<div style={{textAlign:"center",fontSize:"13px",color:"rgba(255,255,255,0.3)"}}>Cita cancelada</div>}
           </div>
         </div>
       )}
+
+      {/* Modal siguiente sesión */}
+      {modalSig&&citaCompletada&&(
+        <div className="overlay">
+          <div className="glass" style={{width:420,padding:"28px",borderColor:"rgba(16,185,129,0.3)"}}>
+            <div style={{textAlign:"center",marginBottom:"20px"}}>
+              <div style={{fontSize:"28px",marginBottom:"8px"}}>📅</div>
+              <div style={{fontSize:"16px",fontWeight:700,marginBottom:"4px"}}>¡Sesión completada!</div>
+              <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)"}}>¿Agendamos la siguiente sesión de {citaCompletada.clienta_nombre}?</div>
+              <div style={{fontSize:"12px",color:"#10b981",marginTop:"6px"}}>Sesión {citaCompletada.sesion_numero+1} de 8 · {citaCompletada.servicio}</div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:"12px",marginBottom:"20px"}}>
+              <div>
+                <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"6px",letterSpacing:"1px"}}>FECHA (aprox. 1 mes después)</div>
+                <input type="date" className="inp" value={fechaSig} min={hoy()} onChange={e=>setFechaSig(e.target.value)} style={{colorScheme:"dark"}}/>
+              </div>
+              <div>
+                <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"6px",letterSpacing:"1px"}}>HORA</div>
+                <input type="time" className="inp" value={horaSig} onChange={e=>setHoraSig(e.target.value)} style={{colorScheme:"dark"}}/>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:"8px"}}>
+              <button className="btn-ghost" style={{flex:1}} onClick={()=>setModalSig(false)}>Después</button>
+              <button className="btn-blue" style={{flex:2,padding:"12px"}} disabled={!fechaSig||!horaSig||saving} onClick={agendarSiguiente}>
+                {saving?"Agendando...":"✓ Agendar siguiente sesión"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal nueva cita */}
       {modal&&(
         <div className="overlay">
-          <div className="glass" style={{width:500,maxHeight:"88vh",overflow:"auto",padding:"26px"}}>
-            <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"22px"}}>
+          <div className="glass" style={{width:500,maxHeight:"90vh",overflow:"auto",padding:"26px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"20px"}}>
               {[{n:1,l:"Clienta"},{n:2,l:"Servicio"},{n:3,l:"Horario"}].map((p,i)=>(
                 <div key={p.n} style={{display:"flex",alignItems:"center",gap:"8px",flex:i<2?1:"auto"}}>
                   <div className="paso-ind" style={{background:paso>=p.n?"#2721E8":"rgba(255,255,255,0.06)",color:paso>=p.n?"#fff":"rgba(255,255,255,0.3)",flexShrink:0}}>{p.n}</div>
@@ -322,6 +426,7 @@ function Agenda({ session }) {
               ))}
               <button onClick={resetM} style={{background:"none",border:"none",color:"rgba(255,255,255,0.4)",cursor:"pointer",fontSize:"20px",marginLeft:"auto"}}>×</button>
             </div>
+
             {paso===1&&(
               <div>
                 <div style={{fontSize:"14px",fontWeight:600,marginBottom:"14px"}}>¿Quién viene?</div>
@@ -333,7 +438,7 @@ function Agenda({ session }) {
                   <div style={{position:"relative"}}>
                     <input className="inp" placeholder="Buscar por nombre..." value={busqueda} onChange={e=>{setBusqueda(e.target.value);buscarC(e.target.value);setClientaSel(null);}}/>
                     {clientasEnc.length>0&&(
-                      <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#1a1b2e",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"10px",zIndex:10,overflow:"hidden",marginTop:"4px"}}>
+                      <div style={{position:"absolute",top:"100%",left:0,right:0,background:"#1a1b2e",border:"1px solid rgba(255,255,255,0.1)",borderRadius:"10px",zIndex:20,overflow:"hidden",marginTop:"4px"}}>
                         {clientasEnc.map(c=>(<div key={c.id} className="clienta-sugg" onClick={()=>selC(c)}><div style={{fontSize:"13px",fontWeight:500}}>{c.nombre}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>{c.telefono}</div></div>))}
                       </div>
                     )}
@@ -360,17 +465,18 @@ function Agenda({ session }) {
                   <div style={{display:"flex",flexDirection:"column",gap:"9px"}}>
                     <input className="inp" placeholder="Nombre completo *" value={nombreN} onChange={e=>setNombreN(e.target.value)}/>
                     <input className="inp" placeholder="Teléfono (opcional)" value={telN} onChange={e=>setTelN(e.target.value)}/>
-                    <div style={{fontSize:"11px",color:"#f0c040",padding:"10px",background:"rgba(240,192,64,0.06)",borderRadius:"8px",border:"1px solid rgba(240,192,64,0.15)"}}>💰 Nueva clienta — cobrar en POS</div>
+                    <div style={{fontSize:"11px",color:"#f0c040",padding:"10px",background:"rgba(240,192,64,0.06)",borderRadius:"8px",border:"1px solid rgba(240,192,64,0.15)"}}>💰 Nueva clienta — cobrar en POS al terminar</div>
                   </div>
                 )}
-                <button className="btn-blue" style={{width:"100%",marginTop:"18px",padding:"12px"}} disabled={esNueva?!nombreN:!clientaSel} onClick={()=>setPaso(2)}>Continuar →</button>
+                <button className="btn-blue" style={{width:"100%",marginTop:"16px",padding:"12px"}} disabled={esNueva?!nombreN:!clientaSel} onClick={()=>setPaso(2)}>Continuar →</button>
               </div>
             )}
+
             {paso===2&&(
               <div>
                 <div style={{fontSize:"14px",fontWeight:600,marginBottom:"4px"}}>Tipo de servicio</div>
                 <div style={{fontSize:"11px",color:"rgba(255,255,255,0.4)",marginBottom:"14px"}}>{paqElegido?`Paquete: ${paqElegido.servicio}`:"Nueva clienta"}</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:"8px",marginBottom:"16px"}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:"8px",marginBottom:"14px"}}>
                   {TIPOS_SVC.map(t=>(
                     <div key={t.id} className="tipo-btn" style={{borderColor:tipoSvc?.id===t.id?t.color:"rgba(255,255,255,0.08)",background:tipoSvc?.id===t.id?`${t.color}15`:"rgba(0,0,0,0.2)"}} onClick={()=>setTipoSvc(t)}>
                       <div style={{fontSize:"13px",fontWeight:600,color:tipoSvc?.id===t.id?t.color:"#fff"}}>{t.label}</div>
@@ -378,32 +484,27 @@ function Agenda({ session }) {
                     </div>
                   ))}
                 </div>
-                <textarea className="inp" rows={2} placeholder="Notas (zona específica, alergias...)" value={notas} onChange={e=>setNotas(e.target.value)} style={{resize:"none",marginBottom:"14px"}}/>
+                <textarea className="inp" rows={2} placeholder="Notas..." value={notas} onChange={e=>setNotas(e.target.value)} style={{resize:"none",marginBottom:"14px"}}/>
                 <div style={{display:"flex",gap:"8px"}}>
                   <button className="btn-ghost" style={{flex:1}} onClick={()=>setPaso(1)}>← Atrás</button>
                   <button className="btn-blue" style={{flex:2,padding:"12px"}} disabled={!tipoSvc} onClick={()=>setPaso(3)}>Continuar →</button>
                 </div>
               </div>
             )}
+
             {paso===3&&(
               <div>
                 <div style={{fontSize:"14px",fontWeight:600,marginBottom:"14px"}}>Fecha y hora</div>
-                <input type="date" className="inp" value={fechaCita} min={hoy()} onChange={e=>setFechaCita(e.target.value)} style={{colorScheme:"dark",marginBottom:"14px"}}/>
+                <input type="date" className="inp" value={fechaCita} min={hoy()} onChange={e=>setFechaCita(e.target.value)} style={{colorScheme:"dark",marginBottom:"12px"}}/>
                 {new Date(fechaCita+"T12:00:00").getDay()===0&&<div style={{fontSize:"12px",color:"#ff6b6b",marginBottom:"10px"}}>⚠ Domingo — cerrado</div>}
-                {bloques.length>0&&(
-                  <div>
-                    <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"8px",letterSpacing:"1px"}}>HORARIOS · {tipoSvc?.duracion} min</div>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:"6px",maxHeight:"180px",overflowY:"auto",paddingRight:"4px",marginBottom:"14px"}}>
-                      {bloques.map(b=>{const oc=ocupado(b),sl=bloqueSel?.ini===b.ini;return(
-                        <div key={b.ini} className="bloque-btn" style={{borderColor:oc?"rgba(255,80,80,0.25)":sl?"#2721E8":"rgba(255,255,255,0.08)",background:oc?"rgba(255,80,80,0.04)":sl?"rgba(39,33,232,0.2)":"rgba(0,0,0,0.2)",color:oc?"rgba(255,80,80,0.4)":sl?"#fff":"rgba(255,255,255,0.5)",cursor:oc?"not-allowed":"pointer"}} onClick={()=>!oc&&setBloqueSel(b)}>
-                          <div style={{fontSize:"12px",fontWeight:sl?700:400}}>{b.ini}</div>
-                          {oc&&<div style={{fontSize:"8px",marginTop:"1px",color:"rgba(255,80,80,0.4)"}}>Ocupado</div>}
-                        </div>
-                      );})}
-                    </div>
-                  </div>
-                )}
-                {bloqueSel&&(
+                <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"8px",letterSpacing:"1px"}}>HORA DE INICIO</div>
+                <input type="time" className="inp" value={bloqueSel?.ini||""} onChange={e=>{
+                  const [h,m]=e.target.value.split(":").map(Number);
+                  const dur=tipoSvc?.duracion||60;
+                  const hf=Math.floor((h*60+m+dur)/60),mf=(h*60+m+dur)%60;
+                  setBloqueSel({ini:e.target.value,fin:`${String(hf).padStart(2,"0")}:${String(mf).padStart(2,"0")}`});
+                }} style={{colorScheme:"dark",marginBottom:"14px"}}/>
+                {bloqueSel?.ini&&(
                   <div style={{padding:"12px",background:"rgba(39,33,232,0.1)",border:"1px solid rgba(39,33,232,0.3)",borderRadius:"10px",marginBottom:"14px"}}>
                     <div style={{fontSize:"13px",fontWeight:600}}>{new Date(fechaCita+"T12:00:00").toLocaleDateString("es-MX",{weekday:"long",day:"numeric",month:"long"})}</div>
                     <div style={{fontSize:"16px",fontWeight:700,color:"#49B8D3",marginTop:"2px"}}>{bloqueSel.ini} – {bloqueSel.fin}</div>
@@ -414,7 +515,7 @@ function Agenda({ session }) {
                 )}
                 <div style={{display:"flex",gap:"8px"}}>
                   <button className="btn-ghost" style={{flex:1}} onClick={()=>setPaso(2)}>← Atrás</button>
-                  <button className="btn-blue" style={{flex:2,padding:"12px"}} disabled={!bloqueSel||saving} onClick={guardarCita}>{saving?"Guardando...":"✓ Confirmar cita"}</button>
+                  <button className="btn-blue" style={{flex:2,padding:"12px"}} disabled={!bloqueSel?.ini||saving} onClick={guardarCita}>{saving?"Guardando...":"✓ Confirmar cita"}</button>
                 </div>
               </div>
             )}
@@ -425,63 +526,165 @@ function Agenda({ session }) {
   );
 }
 
+// ─── Ficha clienta (modal post-ticket) ───────────────────────────────────────
+function ModalFichaClienta({ ticket, onClose, session }) {
+  const [nombre,setNombre]=useState("");
+  const [telefono,setTelefono]=useState("");
+  const [fechaNac,setFechaNac]=useState("");
+  const [comoNos,setComoNos]=useState("");
+  const [saving,setSaving]=useState(false);
+  const [saved,setSaved]=useState(false);
+
+  const guardar=async()=>{
+    if(!nombre)return;setSaving(true);
+    try{
+      // Crear clienta
+      const{data:clienta}=await supabase.from("clientas").insert([{
+        nombre,telefono,fecha_nacimiento:fechaNac||null,
+        como_nos_conocio:comoNos,
+        sucursal_id:session.id,sucursal_nombre:session.nombre,
+      }]).select();
+      // Crear paquetes vinculados a la clienta
+      if(clienta&&clienta[0]){
+        for(const svc of ticket.servicios||[]){
+          if(svc.includes("ses")){
+            const m=svc.match(/(\d+)\s*ses/);
+            const tot=m?parseInt(m[1]):8;
+            await supabase.from("paquetes").insert([{
+              clienta_id:clienta[0].id,clienta_nombre:nombre,
+              sucursal_id:session.id,sucursal_nombre:session.nombre,
+              servicio:svc,total_sesiones:tot,sesiones_usadas:0,
+              precio:0,ticket_id:ticket.id,fecha_compra:hoy(),activo:true,
+            }]);
+          }
+        }
+        // Actualizar paquetes sin clienta de este ticket
+        await supabase.from("paquetes").update({clienta_id:clienta[0].id,clienta_nombre:nombre}).eq("ticket_id",ticket.id);
+      }
+      setSaved(true);
+      setTimeout(()=>onClose(),1500);
+    }catch(e){console.error(e);}
+    setSaving(false);
+  };
+
+  if(saved) return(
+    <div className="overlay">
+      <div className="glass" style={{width:400,padding:"40px",textAlign:"center",borderColor:"rgba(16,185,129,0.3)"}}>
+        <div style={{fontSize:"48px",marginBottom:"12px"}}>✅</div>
+        <div style={{fontSize:"18px",fontWeight:700,marginBottom:"6px"}}>¡Ficha creada!</div>
+        <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)"}}>Perfil de {nombre} guardado correctamente</div>
+      </div>
+    </div>
+  );
+
+  return(
+    <div className="overlay">
+      <div className="glass" style={{width:460,padding:"28px",borderColor:"rgba(39,33,232,0.3)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"20px"}}>
+          <div>
+            <div style={{fontSize:"10px",letterSpacing:"2px",color:"rgba(255,255,255,0.3)",marginBottom:"4px"}}>NUEVA CLIENTA</div>
+            <div style={{fontSize:"18px",fontWeight:700}}>Crear ficha de perfil</div>
+            <div style={{fontSize:"12px",color:"rgba(255,255,255,0.4)",marginTop:"4px"}}>
+              {(ticket.servicios||[]).join(", ")} · {fmt(ticket.total)}
+            </div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,0.4)",cursor:"pointer",fontSize:"22px"}}>×</button>
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:"12px",marginBottom:"20px"}}>
+          <div>
+            <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"6px",letterSpacing:"1px"}}>NOMBRE COMPLETO *</div>
+            <input className="inp" placeholder="Nombre y apellido" value={nombre} onChange={e=>setNombre(e.target.value)}/>
+          </div>
+          <div>
+            <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"6px",letterSpacing:"1px"}}>TELÉFONO / WHATSAPP</div>
+            <input className="inp" placeholder="55 1234 5678" value={telefono} onChange={e=>setTelefono(e.target.value)}/>
+          </div>
+          <div>
+            <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"6px",letterSpacing:"1px"}}>FECHA DE NACIMIENTO</div>
+            <input type="date" className="inp" value={fechaNac} onChange={e=>setFechaNac(e.target.value)} style={{colorScheme:"dark"}}/>
+          </div>
+          <div>
+            <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"6px",letterSpacing:"1px"}}>¿CÓMO NOS CONOCIÓ?</div>
+            <div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}>
+              {COMO_NOS_CONOCIO.map(c=>(
+                <button key={c} className="btn-ghost" style={{borderColor:comoNos===c?"#2721E8":"rgba(255,255,255,0.1)",color:comoNos===c?"#fff":"rgba(255,255,255,0.4)",padding:"6px 12px",fontSize:"11px"}} onClick={()=>setComoNos(c)}>{c}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{display:"flex",gap:"8px"}}>
+          <button className="btn-ghost" style={{flex:1}} onClick={onClose}>Omitir por ahora</button>
+          <button className="btn-blue" style={{flex:2,padding:"13px"}} disabled={!nombre||saving} onClick={guardar}>
+            {saving?"Guardando...":"✓ Crear ficha"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POS COMPONENT
+// POS COMPONENT — grid de tarjetas + ficha clienta
 // ══════════════════════════════════════════════════════════════════════════════
 function POS({ session, onSwitchSucursal, isAdmin }) {
-  const [view,setView]           = useState("pos");
-  const [carrito,setCarrito]     = useState([]);
-  const [busq,setBusq]           = useState("");
-  const [metodo,setMetodo]       = useState("");
-  const [msiSel,setMsiSel]       = useState(0);
-  const [descuento,setDescuento] = useState(0);
+  const [view,setView]             = useState("pos");
+  const [carrito,setCarrito]       = useState([]);
+  const [filtro,setFiltro]         = useState("Todos");
+  const [busq,setBusq]             = useState("");
+  const [metodo,setMetodo]         = useState("");
+  const [msiSel,setMsiSel]         = useState(0);
+  const [descuento,setDescuento]   = useState(0);
   const [tipoClienta,setTipoClienta]=useState("Nueva");
   const [showConfirm,setShowConfirm]=useState(false);
-  const [saving,setSaving]       = useState(false);
-  const [tickets,setTickets]     = useState([]);
-  const [loadingT,setLoadingT]   = useState(false);
-  const [catAbierta,setCatAbierta]=useState(null);
+  const [saving,setSaving]         = useState(false);
+  const [tickets,setTickets]       = useState([]);
+  const [loadingT,setLoadingT]     = useState(false);
+  const [ticketNuevo,setTicketNuevo]=useState(null); // para mostrar ficha
 
-  const agregar=(item)=>{
-    setCarrito(c=>{const ex=c.find(x=>x.nombre===item.nombre);return ex?c.map(x=>x.nombre===item.nombre?{...x,qty:x.qty+1}:x):[...c,{...item,qty:1}];});
-  };
+  const todosItems = CATALOGO.flatMap(c=>c.items.map(i=>({...i,categoria:c.categoria})));
+  const itemsFiltrados = todosItems.filter(i=>{
+    const matchFiltro = ITEM_FILTRO(i,filtro);
+    const matchBusq   = !busq || i.nombre.toLowerCase().includes(busq.toLowerCase());
+    return matchFiltro && matchBusq;
+  });
+
+  const agregar=(item)=>setCarrito(c=>{const ex=c.find(x=>x.nombre===item.nombre);return ex?c.map(x=>x.nombre===item.nombre?{...x,qty:x.qty+1}:x):[...c,{...item,qty:1}];});
   const quitar=(nombre)=>setCarrito(c=>c.map(x=>x.nombre===nombre?{...x,qty:x.qty-1}:x).filter(x=>x.qty>0));
   const total=carrito.reduce((s,i)=>s+i.precio*i.qty,0);
   const totalConDesc=Math.round(total*(1-descuento/100));
   const msiDisponibles=[...new Set(carrito.flatMap(i=>i.msi||[]))].sort((a,b)=>a-b);
-  const filtradas=CATALOGO.map(cat=>({...cat,items:cat.items.filter(it=>it.nombre.toLowerCase().includes(busq.toLowerCase()))})).filter(cat=>cat.items.length>0);
 
   const cerrarTicket=async()=>{
     setSaving(true);
     try{
-      const {data}=await supabase.from("tickets").insert([{
+      const{data}=await supabase.from("tickets").insert([{
         sucursal_id:session.id,sucursal_nombre:session.nombre,
         servicios:carrito.map(i=>i.nombre),
         total:totalConDesc,metodo_pago:metodo+(msiSel>0?` ${msiSel}MSI`:""),
         descuento,tipo_clienta:tipoClienta,fecha:hoy(),
       }]).select();
-
-      // Crear paquetes para sesiones láser/servicios con múltiples sesiones
       if(data&&data[0]){
         const ticketId=data[0].id;
         for(const item of carrito){
           if(item.nombre.includes("ses")){
-            const sesMatch=item.nombre.match(/(\d+)\s*ses/);
-            const totalSes=sesMatch?parseInt(sesMatch[1]):8;
+            const m=item.nombre.match(/(\d+)\s*ses/);
+            const tot=m?parseInt(m[1]):8;
             for(let q=0;q<item.qty;q++){
               await supabase.from("paquetes").insert([{
                 clienta_id:null,clienta_nombre:"—",
                 sucursal_id:session.id,sucursal_nombre:session.nombre,
-                servicio:item.nombre,total_sesiones:totalSes,
-                sesiones_usadas:0,precio:item.precio,
-                ticket_id:ticketId,fecha_compra:hoy(),activo:true,
+                servicio:item.nombre,total_sesiones:tot,sesiones_usadas:0,
+                precio:item.precio,ticket_id:ticketId,fecha_compra:hoy(),activo:true,
               }]);
             }
           }
         }
+        // Si es nueva clienta → mostrar ficha
+        if(tipoClienta==="Nueva") setTicketNuevo(data[0]);
       }
-
       setCarrito([]);setMetodo("");setMsiSel(0);setDescuento(0);setTipoClienta("Nueva");setShowConfirm(false);
     }catch(e){console.error(e);}
     setSaving(false);
@@ -490,20 +693,21 @@ function POS({ session, onSwitchSucursal, isAdmin }) {
   const cargarTickets=async(sid)=>{
     setLoadingT(true);
     const{data}=await supabase.from("tickets").select("*").eq("sucursal_id",sid).eq("fecha",hoy()).order("created_at",{ascending:false});
-    if(data)setTickets(data);
-    setLoadingT(false);
+    if(data)setTickets(data);setLoadingT(false);
   };
+
+  const totalHoy=tickets.reduce((s,t)=>s+Number(t.total),0);
 
   return(
     <div style={{height:"100vh",display:"flex",flexDirection:"column",background:"#0C0D1A",color:"#fff"}}>
-      {/* Topbar POS */}
+      {/* Topbar */}
       <div style={{height:"64px",padding:"0 20px",borderBottom:"1px solid rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(0,0,0,0.4)",backdropFilter:"blur(20px)",flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:"16px"}}>
           <div style={{fontSize:"18px",fontWeight:700,letterSpacing:"4px"}}>CIRE</div>
           <div style={{width:"1px",height:"18px",background:"rgba(255,255,255,0.1)"}}/>
           <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
             <div style={{width:"8px",height:"8px",borderRadius:"50%",background:session.color}}/>
-            <div style={{fontSize:"13px",color:"rgba(255,255,255,0.35)",fontWeight:300}}>Punto de Venta · {session.nombre}</div>
+            <div style={{fontSize:"13px",color:"rgba(255,255,255,0.35)",fontWeight:300}}>{session.nombre}</div>
           </div>
           <div style={{display:"flex"}}>
             {["pos","agenda","historial"].map(v=>(
@@ -514,15 +718,16 @@ function POS({ session, onSwitchSucursal, isAdmin }) {
             ))}
           </div>
         </div>
-        <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
-          {isAdmin&&(
-            <button className="btn-ghost" onClick={onSwitchSucursal} style={{fontSize:"11px"}}>⚙ Cambiar sucursal</button>
+        <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+          {view==="historial"&&tickets.length>0&&(
+            <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)"}}>HOY <span style={{color:"#49B8D3",fontWeight:700}}>{fmt(totalHoy)}</span></div>
           )}
+          {isAdmin&&<button className="btn-ghost" onClick={onSwitchSucursal} style={{fontSize:"11px"}}>← Dashboard</button>}
         </div>
       </div>
 
       {/* Vista Agenda */}
-      {view==="agenda"&&<Agenda session={session}/>}
+      {view==="agenda"&&<AgendaCalendar session={session}/>}
 
       {/* Vista Historial */}
       {view==="historial"&&(
@@ -535,7 +740,7 @@ function POS({ session, onSwitchSucursal, isAdmin }) {
               <div key={t.id} className="glass" style={{padding:"16px 20px"}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                   <div>
-                    <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginBottom:"4px"}}>{new Date(t.created_at).toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"})} · {t.tipo_clienta}</div>
+                    <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginBottom:"4px"}}>{new Date(t.created_at).toLocaleTimeString("es-MX",{hour:"2-digit",minute:"2-digit"})} · <span style={{color:t.tipo_clienta==="Nueva"?"#2721E8":"#49B8D3"}}>{t.tipo_clienta}</span></div>
                     <div style={{fontSize:"13px",fontWeight:500}}>{(t.servicios||[]).join(", ")}</div>
                     <div style={{fontSize:"12px",color:"rgba(255,255,255,0.3)",marginTop:"4px"}}>{t.metodo_pago}{t.descuento>0?` · ${t.descuento}% desc`:""}</div>
                   </div>
@@ -547,74 +752,104 @@ function POS({ session, onSwitchSucursal, isAdmin }) {
           {tickets.length>0&&(
             <div style={{marginTop:"16px",padding:"16px 20px",background:"rgba(39,33,232,0.08)",border:"1px solid rgba(39,33,232,0.2)",borderRadius:"12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <div style={{fontSize:"13px",color:"rgba(255,255,255,0.5)"}}>{tickets.length} tickets · {tickets.filter(t=>t.tipo_clienta==="Nueva").length} nuevas</div>
-              <div style={{fontSize:"20px",fontWeight:700}}>{fmt(tickets.reduce((s,t)=>s+Number(t.total),0))}</div>
+              <div style={{fontSize:"20px",fontWeight:700}}>{fmt(totalHoy)}</div>
             </div>
           )}
         </div>
       )}
 
-      {/* Vista POS */}
+      {/* Vista POS — GRID DE TARJETAS */}
       {view==="pos"&&(
-        <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 360px",overflow:"hidden"}}>
+        <div style={{flex:1,display:"grid",gridTemplateColumns:"1fr 340px",overflow:"hidden"}}>
           {/* Catálogo */}
-          <div style={{padding:"20px 24px",overflowY:"auto"}}>
-            <input className="inp" placeholder="Buscar servicio..." value={busq} onChange={e=>setBusq(e.target.value)} style={{marginBottom:"16px"}}/>
-            {filtradas.map(cat=>(
-              <div key={cat.categoria} style={{marginBottom:"8px"}}>
-                <div onClick={()=>setCatAbierta(catAbierta===cat.categoria?null:cat.categoria)}
-                  style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 14px",borderRadius:"10px",cursor:"pointer",background:catAbierta===cat.categoria?"rgba(39,33,232,0.1)":"rgba(255,255,255,0.03)",border:`1px solid ${catAbierta===cat.categoria?"rgba(39,33,232,0.3)":"rgba(255,255,255,0.06)"}`,marginBottom:"4px"}}>
-                  <div style={{fontSize:"13px",fontWeight:600}}>{cat.categoria}</div>
-                  <div style={{fontSize:"12px",color:"rgba(255,255,255,0.3)"}}>{catAbierta===cat.categoria?"▲":"▼"}</div>
-                </div>
-                {(catAbierta===cat.categoria||busq)&&cat.items.map(item=>(
-                  <div key={item.nombre} className="item-cat" style={{background:carrito.find(x=>x.nombre===item.nombre)?"rgba(39,33,232,0.08)":"",borderColor:carrito.find(x=>x.nombre===item.nombre)?"rgba(39,33,232,0.25)":"transparent"}}>
-                    <div>
-                      <div style={{fontSize:"13px",fontWeight:500}}>{item.nombre}</div>
-                      {item.msi?.length>0&&<div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginTop:"2px"}}>hasta {Math.max(...item.msi)} MSI</div>}
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
-                      <div style={{fontSize:"14px",fontWeight:600,color:"#49B8D3"}}>{fmt(item.precio)}</div>
-                      <button onClick={()=>agregar(item)} style={{width:"28px",height:"28px",borderRadius:"8px",background:"#2721E8",border:"none",color:"#fff",fontSize:"18px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1}}>+</button>
-                    </div>
-                  </div>
+          <div style={{display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            {/* Filtros + búsqueda */}
+            <div style={{padding:"12px 20px",borderBottom:"1px solid rgba(255,255,255,0.06)",flexShrink:0}}>
+              <div style={{display:"flex",gap:"6px",marginBottom:"10px",flexWrap:"wrap"}}>
+                {FILTROS.map(f=>(
+                  <button key={f} onClick={()=>setFiltro(f)}
+                    style={{padding:"6px 14px",borderRadius:"20px",border:"1px solid",fontSize:"12px",fontWeight:500,cursor:"pointer",transition:"all 0.15s",
+                      background:filtro===f?"#2721E8":"transparent",
+                      borderColor:filtro===f?"#2721E8":"rgba(255,255,255,0.12)",
+                      color:filtro===f?"#fff":"rgba(255,255,255,0.45)"}}>
+                    {f}
+                  </button>
                 ))}
               </div>
-            ))}
+              <input className="inp" placeholder="Buscar servicio..." value={busq} onChange={e=>setBusq(e.target.value)} style={{padding:"8px 14px",fontSize:"12px"}}/>
+            </div>
+            {/* Grid tarjetas */}
+            <div style={{flex:1,overflowY:"auto",padding:"16px 20px"}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px"}}>
+                {itemsFiltrados.map(item=>{
+                  const enCarrito=carrito.find(x=>x.nombre===item.nombre);
+                  const catLabel=item.categoria.replace(" Láser","").replace("Zonas Individuales","Individual").replace("Corporal","Corp.");
+                  return(
+                    <div key={item.nombre}
+                      onClick={()=>agregar(item)}
+                      style={{background:enCarrito?"rgba(39,33,232,0.15)":"rgba(255,255,255,0.03)",border:`1px solid ${enCarrito?"rgba(39,33,232,0.5)":"rgba(255,255,255,0.08)"}`,borderRadius:"12px",padding:"14px 14px 12px",cursor:"pointer",transition:"all 0.15s",position:"relative"}}
+                      onMouseEnter={e=>{if(!enCarrito)e.currentTarget.style.background="rgba(255,255,255,0.06)";}}
+                      onMouseLeave={e=>{if(!enCarrito)e.currentTarget.style.background="rgba(255,255,255,0.03)";}}>
+                      <div style={{fontSize:"9px",color:"rgba(255,255,255,0.3)",letterSpacing:"1px",marginBottom:"5px",textTransform:"uppercase"}}>{catLabel}</div>
+                      <div style={{fontSize:"13px",fontWeight:600,lineHeight:1.3,marginBottom:"8px",minHeight:"36px"}}>{item.nombre}</div>
+                      <div style={{fontSize:"16px",fontWeight:700,color:"#49B8D3"}}>{fmt(item.precio)}</div>
+                      {item.msi?.length>0&&<div style={{fontSize:"9px",color:"rgba(255,255,255,0.25)",marginTop:"3px"}}>hasta {Math.max(...item.msi)} MSI</div>}
+                      {enCarrito&&(
+                        <div style={{position:"absolute",top:"8px",right:"8px",width:"20px",height:"20px",borderRadius:"50%",background:"#2721E8",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"11px",fontWeight:700}}>
+                          {enCarrito.qty}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          {/* Carrito */}
+          {/* Panel derecho — NUEVO TICKET */}
           <div style={{borderLeft:"1px solid rgba(255,255,255,0.06)",display:"flex",flexDirection:"column",background:"rgba(0,0,0,0.2)"}}>
-            <div style={{padding:"16px 20px",borderBottom:"1px solid rgba(255,255,255,0.06)",fontSize:"13px",fontWeight:600}}>
-              Carrito {carrito.length>0&&<span style={{background:"#2721E8",color:"#fff",borderRadius:"10px",padding:"1px 8px",fontSize:"11px",marginLeft:"6px"}}>{carrito.reduce((s,i)=>s+i.qty,0)}</span>}
+            <div style={{padding:"14px 18px",borderBottom:"1px solid rgba(255,255,255,0.06)"}}>
+              <div style={{fontSize:"10px",letterSpacing:"2px",color:"rgba(255,255,255,0.3)",marginBottom:"12px"}}>NUEVO TICKET</div>
+              {/* Tipo clienta */}
+              <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"6px",letterSpacing:"1px"}}>DATOS DE CLIENTA</div>
+              <div style={{display:"flex",gap:"6px",marginBottom:"10px"}}>
+                {["Nueva","Recurrente"].map(t=>(
+                  <button key={t} onClick={()=>setTipoClienta(t)}
+                    style={{flex:1,padding:"8px",borderRadius:"8px",border:"1px solid",fontSize:"12px",fontWeight:600,cursor:"pointer",transition:"all 0.15s",
+                      background:tipoClienta===t?"#2721E8":"transparent",
+                      borderColor:tipoClienta===t?"#2721E8":"rgba(255,255,255,0.12)",
+                      color:tipoClienta===t?"#fff":"rgba(255,255,255,0.4)"}}>
+                    {t==="Nueva"?"⭐ Nueva":"↩ Recurrente"}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div style={{flex:1,overflowY:"auto",padding:"12px 16px"}}>
-              {carrito.length===0&&<div style={{color:"rgba(255,255,255,0.15)",textAlign:"center",paddingTop:"40px",fontSize:"13px"}}>Agrega servicios al carrito</div>}
+
+            {/* Servicios seleccionados */}
+            <div style={{flex:1,overflowY:"auto",padding:"12px 18px"}}>
+              <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"8px",letterSpacing:"1px"}}>SERVICIOS</div>
+              {carrito.length===0&&<div style={{color:"rgba(255,255,255,0.12)",textAlign:"center",paddingTop:"30px",fontSize:"12px"}}>Selecciona del menú</div>}
               {carrito.map(item=>(
-                <div key={item.nombre} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
-                  <div style={{flex:1}}>
+                <div key={item.nombre} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.05)"}}>
+                  <div style={{flex:1,marginRight:"8px"}}>
                     <div style={{fontSize:"12px",fontWeight:500,lineHeight:1.3}}>{item.nombre}</div>
-                    <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginTop:"2px"}}>{fmt(item.precio)} c/u</div>
+                    <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginTop:"1px"}}>{fmt(item.precio)}</div>
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-                    <button onClick={()=>quitar(item.nombre)} style={{width:"24px",height:"24px",borderRadius:"6px",background:"rgba(255,255,255,0.06)",border:"none",color:"#fff",cursor:"pointer",fontSize:"14px"}}>−</button>
-                    <span style={{fontSize:"13px",fontWeight:600,minWidth:"16px",textAlign:"center"}}>{item.qty}</span>
-                    <button onClick={()=>agregar(item)} style={{width:"24px",height:"24px",borderRadius:"6px",background:"rgba(255,255,255,0.06)",border:"none",color:"#fff",cursor:"pointer",fontSize:"14px"}}>+</button>
-                    <span style={{fontSize:"13px",fontWeight:600,color:"#49B8D3",minWidth:"70px",textAlign:"right"}}>{fmt(item.precio*item.qty)}</span>
+                  <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                    <button onClick={()=>quitar(item.nombre)} style={{width:"22px",height:"22px",borderRadius:"6px",background:"rgba(255,255,255,0.06)",border:"none",color:"#fff",cursor:"pointer",fontSize:"14px"}}>−</button>
+                    <span style={{fontSize:"12px",fontWeight:600,minWidth:"14px",textAlign:"center"}}>{item.qty}</span>
+                    <button onClick={()=>agregar(item)} style={{width:"22px",height:"22px",borderRadius:"6px",background:"rgba(255,255,255,0.06)",border:"none",color:"#fff",cursor:"pointer",fontSize:"14px"}}>+</button>
+                    <span style={{fontSize:"12px",fontWeight:600,color:"#49B8D3",minWidth:"60px",textAlign:"right"}}>{fmt(item.precio*item.qty)}</span>
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* Total y cobrar */}
             {carrito.length>0&&(
-              <div style={{padding:"16px 20px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
-                <div style={{display:"flex",gap:"8px",marginBottom:"10px"}}>
-                  {["Nueva","Recurrente"].map(t=>(
-                    <button key={t} onClick={()=>setTipoClienta(t)} className="btn-ghost" style={{flex:1,borderColor:tipoClienta===t?"#2721E8":"rgba(255,255,255,0.1)",color:tipoClienta===t?"#fff":"rgba(255,255,255,0.4)",fontSize:"11px",padding:"6px"}}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
-                <button className="btn-blue" style={{width:"100%",padding:"14px",fontSize:"15px"}} onClick={()=>setShowConfirm(true)}>
-                  Cobrar {fmt(total*(1-descuento/100))}
+              <div style={{padding:"14px 18px",borderTop:"1px solid rgba(255,255,255,0.06)"}}>
+                <button className="btn-blue" style={{width:"100%",padding:"13px",fontSize:"14px"}} onClick={()=>setShowConfirm(true)}>
+                  Cobrar {fmt(total)}
                 </button>
               </div>
             )}
@@ -622,12 +857,12 @@ function POS({ session, onSwitchSucursal, isAdmin }) {
         </div>
       )}
 
-      {/* Modal confirmar */}
+      {/* Modal confirmar cobro */}
       {showConfirm&&(
         <div className="overlay">
           <div className="glass" style={{width:420,padding:"28px"}}>
             <div style={{fontSize:"11px",letterSpacing:"2px",color:"rgba(255,255,255,0.3)",marginBottom:"16px"}}>CONFIRMAR COBRO</div>
-            <div style={{display:"flex",flexDirection:"column",gap:"10px",marginBottom:"18px"}}>
+            <div style={{display:"flex",flexDirection:"column",gap:"12px",marginBottom:"18px"}}>
               <div>
                 <div style={{fontSize:"10px",color:"rgba(255,255,255,0.3)",marginBottom:"6px",letterSpacing:"1px"}}>MÉTODO DE PAGO</div>
                 <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"6px"}}>
@@ -677,10 +912,18 @@ function POS({ session, onSwitchSucursal, isAdmin }) {
           </div>
         </div>
       )}
+
+      {/* Modal ficha nueva clienta */}
+      {ticketNuevo&&(
+        <ModalFichaClienta
+          ticket={ticketNuevo}
+          session={session}
+          onClose={()=>setTicketNuevo(null)}
+        />
+      )}
     </div>
   );
 }
-
 
 // ══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD COMPONENT
