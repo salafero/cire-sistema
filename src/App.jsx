@@ -7,6 +7,49 @@ const META_TOKEN   = import.meta.env.VITE_META_TOKEN;
 const META_ACCOUNT = import.meta.env.VITE_META_ACCOUNT;
 const supabase     = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+const CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Albert+Sans:wght@300;400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:#0C0D1A;font-family:'Albert Sans',sans-serif;}
+  ::-webkit-scrollbar{width:4px;height:4px;background:transparent;}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:2px;}
+  .glass{background:rgba(255,255,255,0.04);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-radius:16px;}
+  .glass-dark{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:12px;}
+  .kpi{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:14px;padding:20px 22px;}
+  .kpi.hi{border-color:rgba(39,33,232,0.5);background:rgba(39,33,232,0.08);}
+  .kpi.green{border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.06);}
+  .kpi.orange{border-color:rgba(249,115,22,0.4);background:rgba(249,115,22,0.06);}
+  .inp{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:10px 14px;color:#fff;font-family:'Albert Sans',sans-serif;font-size:13px;width:100%;outline:none;transition:border 0.2s;}
+  .inp:focus{border-color:#2721E8;}
+  .inp::placeholder{color:rgba(255,255,255,0.2);}
+  .btn-blue{background:#2721E8;color:#fff;border:none;border-radius:10px;padding:10px 20px;font-family:'Albert Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;}
+  .btn-blue:hover{background:#3d38f0;}
+  .btn-blue:disabled{background:rgba(39,33,232,0.3);cursor:default;}
+  .btn-ghost{background:transparent;color:rgba(255,255,255,0.5);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:8px 16px;font-family:'Albert Sans',sans-serif;font-size:12px;cursor:pointer;transition:all 0.2s;}
+  .btn-ghost:hover{border-color:#2721E8;color:#fff;}
+  .nav-tab{padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:rgba(255,255,255,0.35);transition:all 0.18s;}
+  .nav-tab.active{color:#fff;border-bottom-color:#2721E8;}
+  .nav-tab:hover{color:rgba(255,255,255,0.7);}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:center;justify-content:center;}
+  .tab-dash{padding:10px 20px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:rgba(255,255,255,0.35);transition:all 0.18s;}
+  .tab-dash.active{color:#fff;border-bottom-color:#2721E8;}
+  .tab-dash:hover{color:rgba(255,255,255,0.7);}
+  .rank-row{display:grid;grid-template-columns:32px 110px 1fr 110px 110px 100px;gap:0;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,0.04);align-items:center;}
+  .rank-row:hover{background:rgba(255,255,255,0.02);}
+  .cita-card{border-radius:8px;padding:8px 10px;margin-bottom:4px;cursor:pointer;transition:opacity 0.15s;border-left:3px solid;}
+  .cita-card:hover{opacity:0.8;}
+  .bloque-btn{padding:8px 6px;border-radius:8px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid;transition:all 0.15s;text-align:center;}
+  .clienta-sugg{padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.05);transition:background 0.15s;}
+  .clienta-sugg:hover{background:rgba(39,33,232,0.2);}
+  .paq-card{padding:12px;border-radius:10px;border:1px solid;cursor:pointer;transition:all 0.15s;margin-bottom:8px;}
+  .paq-card:hover{border-color:#2721E8;}
+  .tipo-btn{padding:10px 14px;border-radius:10px;border:1px solid;cursor:pointer;transition:all 0.15s;text-align:center;}
+  .paso-ind{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
+  .item-cat{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;cursor:pointer;transition:background 0.15s;border:1px solid transparent;}
+  .item-cat:hover{background:rgba(255,255,255,0.04);}
+  .item-cat.selected{background:rgba(39,33,232,0.12);border-color:rgba(39,33,232,0.3);}
+`;
+
 // ─── USUARIOS ─────────────────────────────────────────────────────────────────
 const USUARIOS = [
   { id:1, nombre:"Coapa",    usuario:"coapa",      password:"cire2026",    rol:"sucursal", color:"#2721E8" },
