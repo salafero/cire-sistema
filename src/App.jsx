@@ -93,6 +93,34 @@ const CATALOGO = [
 const TIPOS_SVC = [
   { id:"laser",       label:"Láser",          duracion:60, color:"#2721E8" },
   { id:"facial_baby", label:"Baby Clean",      duracion:60, color:"#49B8D3" },
+  { id:"facial_full", label:"FullFace",        duracion:90, color:"#49B8D3" },
+  { id:"corporal",    label:"Corporal/Moldeo", duracion:60, color:"#a855f7" },
+  { id:"hifu",        label:"HIFU 4D",         duracion:90, color:"#f97316" },
+  { id:"post_op",     label:"Post operatorio", duracion:60, color:"#10b981" },
+];
+const HORARIOS = {1:{a:"10:00",c:"20:00"},2:{a:"10:00",c:"20:00"},3:{a:"10:00",c:"20:00"},4:{a:"10:00",c:"20:00"},5:{a:"10:00",c:"20:00"},6:{a:"09:00",c:"16:00"},0:null};
+const DIAS_L   = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+
+function generarBloques(fecha, dur) {
+  const dow=new Date(fecha+"T12:00:00").getDay(), h=HORARIOS[dow];
+  if(!h) return [];
+  const bl=[], [hA,mA]=h.a.split(":").map(Number), [hC,mC]=h.c.split(":").map(Number);
+  let m=hA*60+mA; const fin=hC*60+mC;
+  while(m+dur<=fin){
+    const hh=Math.floor(m/60),mm=m%60,hf=Math.floor((m+dur)/60),mf=(m+dur)%60;
+    bl.push({ini:`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`,fin:`${String(hf).padStart(2,"0")}:${String(mf).padStart(2,"0")}`});
+    m+=30;
+  }
+  return bl;
+}
+function semanaD(fecha){
+  const base=new Date(fecha+"T12:00:00"),dow=base.getDay(),l=new Date(base);
+  l.setDate(base.getDate()-(dow===0?6:dow-1));
+  return Array.from({length:6},(_,i)=>{const d=new Date(l);d.setDate(l.getDate()+i);return d.toISOString().slice(0,10);});
+}
+const lFecha=(f)=>new Date(f+"T12:00:00").toLocaleDateString("es-MX",{weekday:"short",day:"numeric",month:"short"});
+const colorT=(t)=>TIPOS_SVC.find(x=>x.id===t)?.color||"#2721E8";
+
 // ══════════════════════════════════════════════════════════════════════════════
 // POS COMPONENT — con grid visual, ficha clienta, agenda Google Calendar style
 // ══════════════════════════════════════════════════════════════════════════════
