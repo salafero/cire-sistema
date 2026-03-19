@@ -5,7 +5,6 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_KEY;
 const META_TOKEN   = import.meta.env.VITE_META_TOKEN;
 const META_ACCOUNT = import.meta.env.VITE_META_ACCOUNT;
-const GCAL_CLIENT_ID = import.meta.env.VITE_GCAL_CLIENT_ID;
 const supabase     = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const CSS = `
@@ -441,246 +440,182 @@ function POS({session,onSwitchSucursal,isAdmin}){
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// GOOGLE CALENDAR IMPORT — OAuth + fetch + preview + import to Supabase
+// IMPORTAR CALENDARIO — Archivo .ics exportado de Google Calendar
 // ══════════════════════════════════════════════════════════════════════════════
+function parseICS(text){
+  const events=[];let cur=null;
+  text.split(/\r?\n/).forEach(line=>{
+    if(line==="BEGIN:VEVENT"){cur={summary:"",description:"",dtstart:"",dtend:""};}
+    else if(line==="END:VEVENT"&&cur){events.push(cur);cur=null;}
+    else if(cur){
+      if(line.startsWith("SUMMARY:")){cur.summary+=line.slice(8);}
+      else if(line.startsWith("DESCRIPTION:")){cur.description+=line.slice(12);}
+      else if(line.startsWith("DTSTART")){const m=line.match(/(\d{4})(\d{2})(\d{2})T?(\d{2})?(\d{2})?/);if(m)cur.dtstart=`${m[1]}-${m[2]}-${m[3]}T${m[4]||"10"}:${m[5]||"00"}`;}
+      else if(line.startsWith("DTEND")){const m=line.match(/(\d{4})(\d{2})(\d{2})T?(\d{2})?(\d{2})?/);if(m)cur.dtend=`${m[1]}-${m[2]}-${m[3]}T${m[4]||"11"}:${m[5]||"00"}`;}
+      else if(line.startsWith(" ")&&cur.description){cur.description+=line.slice(1);}
+    }
+  });
+  return events;
+}
+
 function GCalImport({session}){
-  const[token,setToken]=useState(null);
-  const[calendars,setCalendars]=useState([]);
-  const[selCal,setSelCal]=useState(null);
-  const[events,setEvents]=useState([]);
   const[parsed,setParsed]=useState([]);
   const[loading,setLoading]=useState(false);
   const[importing,setImporting]=useState(false);
   const[result,setResult]=useState(null);
-  const[dateFrom,setDateFrom]=useState("2024-01-01");
-  const[dateTo,setDateTo]=useState(hoy());
-  const[step,setStep]=useState(1); // 1=conectar, 2=seleccionar calendario, 3=preview, 4=resultado
+  const[step,setStep]=useState(1); // 1=subir, 2=preview, 3=resultado
+  const[fileName,setFileName]=useState("");
+  const[dragOver,setDragOver]=useState(false);
+  const fileRef=useRef(null);
 
-  // ─── OAuth con Google (popup implicit flow) ────────────────────────────────
-  const conectar=()=>{
-    const redirect=window.location.origin;
-    const scope="https://www.googleapis.com/auth/calendar.readonly";
-    const url=`https://accounts.google.com/o/oauth2/v2/auth?client_id=${GCAL_CLIENT_ID}&redirect_uri=${redirect}&response_type=token&scope=${scope}&prompt=consent`;
-    const popup=window.open(url,"gcal_auth","width=500,height=600");
-    const check=setInterval(()=>{
-      try{
-        if(popup.closed){clearInterval(check);return;}
-        const hash=popup.location.hash;
-        if(hash&&hash.includes("access_token")){
-          const params=new URLSearchParams(hash.substring(1));
-          const t=params.get("access_token");
-          popup.close();clearInterval(check);
-          if(t){setToken(t);setStep(2);cargarCalendarios(t);}
-        }
-      }catch(e){}
-    },500);
-  };
-
-  // ─── Cargar lista de calendarios ───────────────────────────────────────────
-  const cargarCalendarios=async(t)=>{
-    setLoading(true);
-    try{
-      const res=await fetch("https://www.googleapis.com/calendar/v3/users/me/calendarList",{headers:{Authorization:`Bearer ${t}`}});
-      const data=await res.json();
-      setCalendars((data.items||[]).filter(c=>c.accessRole==="owner"||c.accessRole==="writer"));
-    }catch(e){console.error(e);}
-    setLoading(false);
-  };
-
-  // ─── Fetch eventos del calendario seleccionado ─────────────────────────────
-  const fetchEventos=async()=>{
-    if(!selCal||!token)return;setLoading(true);setEvents([]);
-    try{
-      let all=[],pageToken="";
-      const timeMin=new Date(dateFrom+"T00:00:00").toISOString();
-      const timeMax=new Date(dateTo+"T23:59:59").toISOString();
-      do{
-        const url=`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(selCal)}/events?timeMin=${timeMin}&timeMax=${timeMax}&maxResults=250&singleEvents=true&orderBy=startTime${pageToken?`&pageToken=${pageToken}`:""}`;
-        const res=await fetch(url,{headers:{Authorization:`Bearer ${token}`}});
-        const data=await res.json();
-        all=all.concat(data.items||[]);
-        pageToken=data.nextPageToken||"";
-      }while(pageToken);
-      setEvents(all);
-      // Parsear eventos
-      const p=all.filter(e=>e.start?.dateTime||e.start?.date).map(e=>{
-        const titulo=(e.summary||"").trim();
-        const desc=(e.description||"").trim();
-        const start=e.start.dateTime||e.start.date;
-        const end=e.end?.dateTime||e.end?.date||"";
-        const fecha=start.slice(0,10);
-        const horaIni=start.includes("T")?start.slice(11,16):"10:00";
-        const horaFi=end.includes("T")?end.slice(11,16):horaFin(horaIni,60);
-        // Parsear: título = nombre clienta, descripción = servicio + sesión
-        const nombre=titulo||"Sin nombre";
+  const procesarArchivo=(file)=>{
+    if(!file)return;
+    setFileName(file.name);setLoading(true);
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+      const text=e.target.result;
+      const events=parseICS(text);
+      const p=events.map((ev,i)=>{
+        const nombre=(ev.summary||"").replace(/\\n/g," ").replace(/\\,/g,",").trim();
+        const desc=(ev.description||"").replace(/\\n/g,"\n").replace(/\\,/g,",").trim();
+        const fecha=ev.dtstart.slice(0,10);
+        const horaIni=ev.dtstart.slice(11,16)||"10:00";
+        const horaFi=ev.dtend?ev.dtend.slice(11,16):horaFin(horaIni,60);
+        // Parsear sesión de descripción
         let servicio="",sesNum=1,totalSes=8;
-        // Intentar extraer sesión de descripción: "Sesión 3/8", "S3/8", "sesion 3 de 8", "#3"
         const sesMatch=desc.match(/[Ss]esi[oó]n\s*(\d+)\s*[\/de]*\s*(\d+)?/)||desc.match(/[Ss](\d+)\s*[\/de]*\s*(\d+)?/)||desc.match(/#(\d+)\s*[\/de]*\s*(\d+)?/);
         if(sesMatch){sesNum=parseInt(sesMatch[1])||1;totalSes=parseInt(sesMatch[2])||8;}
-        // Servicio: primera línea de descripción sin el patrón de sesión
         const descLines=desc.split(/\n/).map(l=>l.trim()).filter(Boolean);
         servicio=descLines.length>0?descLines[0].replace(/[Ss]esi[oó]n\s*\d+\s*[\/de]*\s*\d*/,"").replace(/[Ss]\d+\s*[\/de]*\s*\d*/,"").replace(/#\d+\s*[\/de]*\s*\d*/,"").trim():"";
         if(!servicio&&descLines.length>1)servicio=descLines[1];
-        // Detectar tipo de servicio
         const tipo=detectTipo(servicio||nombre);
-        // Estado: pasado=completada, futuro=agendada
-        const estado=fecha<hoy()?"completada":fecha===hoy()?"agendada":"agendada";
-        return{id:e.id,nombre,servicio:servicio||tipo.label,tipo:tipo.id,duracion:tipo.duracion,fecha,horaIni,horaFi:horaFi||horaFin(horaIni,tipo.duracion),sesNum,totalSes,estado,incluir:true,gcalId:e.id};
-      });
-      setParsed(p);
-      setStep(3);
-    }catch(e){console.error(e);}
-    setLoading(false);
+        const estado=fecha<hoy()?"completada":"agendada";
+        return{id:`ics-${i}`,nombre:nombre||"Sin nombre",servicio:servicio||tipo.label,tipo:tipo.id,duracion:tipo.duracion,fecha,horaIni,horaFi:horaFi||horaFin(horaIni,tipo.duracion),sesNum,totalSes,estado,incluir:true};
+      }).filter(p=>p.nombre&&p.nombre!=="Sin nombre");
+      // Ordenar por fecha
+      p.sort((a,b)=>a.fecha.localeCompare(b.fecha));
+      setParsed(p);setStep(2);setLoading(false);
+    };
+    reader.readAsText(file);
   };
 
-  // ─── Importar a Supabase ───────────────────────────────────────────────────
+  const onDrop=(e)=>{e.preventDefault();setDragOver(false);const f=e.dataTransfer.files[0];if(f&&f.name.endsWith(".ics"))procesarArchivo(f);};
+  const onFileChange=(e)=>{const f=e.target.files[0];if(f)procesarArchivo(f);};
+
   const importar=async()=>{
     const toImport=parsed.filter(p=>p.incluir);
     if(toImport.length===0)return;
     setImporting(true);setResult(null);
     let clientasCreadas=0,citasCreadas=0,paquetesCreados=0,errores=0;
-    // Agrupar por nombre para crear clientas únicas
     const porNombre={};
     toImport.forEach(p=>{if(!porNombre[p.nombre])porNombre[p.nombre]=[];porNombre[p.nombre].push(p);});
     for(const[nombre,citas] of Object.entries(porNombre)){
       try{
-        // Buscar si ya existe la clienta
         const{data:existing}=await supabase.from("clientas").select("id").eq("nombre",nombre).eq("sucursal_id",session.id).limit(1);
         let clientaId;
         if(existing&&existing.length>0){clientaId=existing[0].id;}
-        else{
-          const{data:nc}=await supabase.from("clientas").insert([{nombre,sucursal_id:session.id,sucursal_nombre:session.nombre}]).select();
-          clientaId=nc?.[0]?.id;clientasCreadas++;
-        }
-        // Agrupar citas por servicio para crear paquetes
+        else{const{data:nc}=await supabase.from("clientas").insert([{nombre,sucursal_id:session.id,sucursal_nombre:session.nombre}]).select();clientaId=nc?.[0]?.id;clientasCreadas++;}
         const porServicio={};
         citas.forEach(c=>{if(!porServicio[c.servicio])porServicio[c.servicio]=[];porServicio[c.servicio].push(c);});
         for(const[servicio,sesiones] of Object.entries(porServicio)){
           const maxSes=Math.max(...sesiones.map(s=>s.totalSes));
           const sesUsadas=sesiones.filter(s=>s.estado==="completada").length;
-          // Crear paquete
-          const{data:paq}=await supabase.from("paquetes").insert([{
-            clienta_id:clientaId,clienta_nombre:nombre,sucursal_id:session.id,sucursal_nombre:session.nombre,
-            servicio,total_sesiones:maxSes,sesiones_usadas:sesUsadas,precio:0,fecha_compra:sesiones[0].fecha,activo:sesUsadas<maxSes
-          }]).select();
+          const{data:paq}=await supabase.from("paquetes").insert([{clienta_id:clientaId,clienta_nombre:nombre,sucursal_id:session.id,sucursal_nombre:session.nombre,servicio,total_sesiones:maxSes,sesiones_usadas:sesUsadas,precio:0,fecha_compra:sesiones[0].fecha,activo:sesUsadas<maxSes}]).select();
           const paqId=paq?.[0]?.id;paquetesCreados++;
-          // Crear citas
           for(const c of sesiones){
-            await supabase.from("citas").insert([{
-              clienta_id:clientaId,clienta_nombre:nombre,paquete_id:paqId,
-              sucursal_id:session.id,sucursal_nombre:session.nombre,
-              servicio:c.servicio,tipo_servicio:c.tipo,duracion_min:c.duracion,
-              fecha:c.fecha,hora_inicio:c.horaIni,hora_fin:c.horaFi,
-              sesion_numero:c.sesNum,es_cobro:c.sesNum===1,estado:c.estado,
-              notas:`Importado de Google Calendar`
-            }]);
+            await supabase.from("citas").insert([{clienta_id:clientaId,clienta_nombre:nombre,paquete_id:paqId,sucursal_id:session.id,sucursal_nombre:session.nombre,servicio:c.servicio,tipo_servicio:c.tipo,duracion_min:c.duracion,fecha:c.fecha,hora_inicio:c.horaIni,hora_fin:c.horaFi,sesion_numero:c.sesNum,es_cobro:c.sesNum===1,estado:c.estado,notas:"Importado de Google Calendar (.ics)"}]);
             citasCreadas++;
           }
         }
       }catch(e){console.error(e);errores++;}
     }
     setResult({clientas:clientasCreadas,citas:citasCreadas,paquetes:paquetesCreados,errores});
-    setStep(4);setImporting(false);
+    setStep(3);setImporting(false);
   };
 
   const toggleEvento=(id)=>setParsed(prev=>prev.map(p=>p.id===id?{...p,incluir:!p.incluir}:p));
   const toggleAll=(v)=>setParsed(prev=>prev.map(p=>({...p,incluir:v})));
   const editEvento=(id,field,val)=>setParsed(prev=>prev.map(p=>p.id===id?{...p,[field]:val}:p));
+  const completadas=parsed.filter(p=>p.incluir&&p.estado==="completada").length;
+  const agendadas=parsed.filter(p=>p.incluir&&p.estado==="agendada").length;
 
   return(
     <div style={{padding:"20px 24px",overflowY:"auto",flex:1,color:"#fff"}}>
       <div style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"20px"}}>
-        <div style={{fontSize:"22px"}}>📅</div>
-        <div><div style={{fontSize:"16px",fontWeight:700}}>Importar desde Google Calendar</div><div style={{fontSize:"12px",color:"rgba(255,255,255,0.3)"}}>Migra tu historial, citas actuales y futuras a Cire</div></div>
+        <div style={{fontSize:"22px"}}>📥</div>
+        <div><div style={{fontSize:"16px",fontWeight:700}}>Importar desde Google Calendar</div><div style={{fontSize:"12px",color:"rgba(255,255,255,0.3)"}}>Sube el archivo .ics exportado de tu calendario · Sucursal: <span style={{color:"#49B8D3"}}>{session.nombre}</span></div></div>
       </div>
 
       {/* Pasos */}
       <div style={{display:"flex",gap:"8px",marginBottom:"24px"}}>
-        {[{n:1,l:"Conectar"},{n:2,l:"Calendario"},{n:3,l:"Revisar"},{n:4,l:"Listo"}].map((p,i)=>(
-          <div key={p.n} style={{display:"flex",alignItems:"center",gap:"8px",flex:i<3?1:"auto"}}>
+        {[{n:1,l:"Subir archivo"},{n:2,l:"Revisar datos"},{n:3,l:"Listo"}].map((p,i)=>(
+          <div key={p.n} style={{display:"flex",alignItems:"center",gap:"8px",flex:i<2?1:"auto"}}>
             <div style={{width:"28px",height:"28px",borderRadius:"50%",background:step>=p.n?"#2721E8":"rgba(255,255,255,0.06)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"12px",fontWeight:700,color:step>=p.n?"#fff":"rgba(255,255,255,0.2)",flexShrink:0}}>{step>p.n?"✓":p.n}</div>
             <div style={{fontSize:"12px",color:step===p.n?"#fff":"rgba(255,255,255,0.3)",fontWeight:step===p.n?600:400}}>{p.l}</div>
-            {i<3&&<div style={{flex:1,height:"1px",background:step>p.n?"#2721E8":"rgba(255,255,255,0.06)"}}/>}
+            {i<2&&<div style={{flex:1,height:"1px",background:step>p.n?"#2721E8":"rgba(255,255,255,0.06)"}}/>}
           </div>
         ))}
       </div>
 
-      {/* PASO 1 — Conectar */}
-      {step===1&&<div style={{textAlign:"center",padding:"40px 20px"}}>
-        <div style={{fontSize:"48px",marginBottom:"16px"}}>🔗</div>
-        <div style={{fontSize:"15px",fontWeight:600,marginBottom:"8px"}}>Conecta tu Google Calendar</div>
-        <div style={{fontSize:"12px",color:"rgba(255,255,255,0.3)",marginBottom:"24px",maxWidth:"400px",margin:"0 auto 24px"}}>Se abrirá una ventana para autorizar lectura de tu calendario. Solo leemos eventos, no modificamos nada.</div>
-        <button className="btn-blue" style={{padding:"14px 32px",fontSize:"14px"}} onClick={conectar}>Conectar con Google →</button>
-        {!GCAL_CLIENT_ID&&<div style={{fontSize:"11px",color:"#ff6b6b",marginTop:"12px"}}>⚠ Falta configurar VITE_GCAL_CLIENT_ID en Vercel</div>}
-      </div>}
-
-      {/* PASO 2 — Seleccionar calendario */}
-      {step===2&&<div>
-        <div style={{fontSize:"14px",fontWeight:600,marginBottom:"12px"}}>Selecciona el calendario de esta sucursal</div>
-        <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginBottom:"16px"}}>Importando para: <span style={{color:"#49B8D3",fontWeight:600}}>{session.nombre}</span></div>
-        {loading?<div style={{textAlign:"center",padding:"40px",color:"rgba(255,255,255,0.3)"}}>Cargando calendarios...</div>:
-        <div style={{display:"flex",flexDirection:"column",gap:"8px",marginBottom:"20px"}}>
-          {calendars.map(c=><div key={c.id} onClick={()=>setSelCal(c.id)} className="glass" style={{padding:"14px 18px",cursor:"pointer",borderColor:selCal===c.id?"#2721E8":"rgba(255,255,255,0.08)"}}
-            onMouseEnter={e=>{if(selCal!==c.id)e.currentTarget.style.borderColor="rgba(39,33,232,0.3)";}} onMouseLeave={e=>{if(selCal!==c.id)e.currentTarget.style.borderColor="rgba(255,255,255,0.08)";}}>
-            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
-              <div style={{width:"12px",height:"12px",borderRadius:"3px",background:c.backgroundColor||"#2721E8",flexShrink:0}}/>
-              <div style={{flex:1}}><div style={{fontSize:"13px",fontWeight:600}}>{c.summary}</div>{c.description&&<div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>{c.description}</div>}</div>
-              {selCal===c.id&&<div style={{fontSize:"14px",color:"#2721E8"}}>✓</div>}
-            </div>
-          </div>)}
-          {calendars.length===0&&<div style={{textAlign:"center",padding:"20px",color:"rgba(255,255,255,0.2)"}}>No se encontraron calendarios</div>}
-        </div>}
-        {selCal&&<div>
-          <div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginBottom:"8px",letterSpacing:"1px"}}>RANGO DE FECHAS</div>
-          <div style={{display:"flex",gap:"10px",marginBottom:"16px"}}>
-            <div style={{flex:1}}><div style={{fontSize:"10px",color:"rgba(255,255,255,0.2)",marginBottom:"4px"}}>DESDE</div><input type="date" className="inp" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} style={{colorScheme:"dark",fontSize:"12px",padding:"8px 12px"}}/></div>
-            <div style={{flex:1}}><div style={{fontSize:"10px",color:"rgba(255,255,255,0.2)",marginBottom:"4px"}}>HASTA</div><input type="date" className="inp" value={dateTo} onChange={e=>setDateTo(e.target.value)} style={{colorScheme:"dark",fontSize:"12px",padding:"8px 12px"}}/></div>
+      {/* PASO 1 — Subir archivo */}
+      {step===1&&<div>
+        <div onDragOver={e=>{e.preventDefault();setDragOver(true);}} onDragLeave={()=>setDragOver(false)} onDrop={onDrop} onClick={()=>fileRef.current?.click()}
+          style={{border:`2px dashed ${dragOver?"#2721E8":"rgba(255,255,255,0.1)"}`,borderRadius:"16px",padding:"60px 40px",textAlign:"center",cursor:"pointer",background:dragOver?"rgba(39,33,232,0.08)":"rgba(255,255,255,0.02)",transition:"all 0.2s"}}>
+          <div style={{fontSize:"48px",marginBottom:"16px"}}>{loading?"⏳":"📄"}</div>
+          <div style={{fontSize:"15px",fontWeight:600,marginBottom:"8px"}}>{loading?"Procesando archivo...":"Arrastra tu archivo .ics aquí"}</div>
+          <div style={{fontSize:"12px",color:"rgba(255,255,255,0.3)",marginBottom:"16px"}}>o haz click para seleccionar</div>
+          <div className="btn-blue" style={{display:"inline-block",padding:"10px 24px",fontSize:"13px"}}>Seleccionar archivo .ics</div>
+        </div>
+        <input ref={fileRef} type="file" accept=".ics" onChange={onFileChange} style={{display:"none"}}/>
+        <div className="glass" style={{padding:"16px 20px",marginTop:"16px"}}>
+          <div style={{fontSize:"11px",fontWeight:600,marginBottom:"8px"}}>¿Cómo exportar desde Google Calendar?</div>
+          <div style={{fontSize:"11px",color:"rgba(255,255,255,0.35)",lineHeight:1.6}}>
+            1. Abre <span style={{color:"#49B8D3"}}>calendar.google.com</span> → ⚙️ Configuración<br/>
+            2. En la barra izquierda, click en el calendario de la sucursal<br/>
+            3. Baja hasta "Exportar calendario" → descarga el .ics<br/>
+            4. Sube ese archivo aquí
           </div>
-          <button className="btn-blue" style={{width:"100%",padding:"13px",fontSize:"14px"}} onClick={fetchEventos} disabled={loading}>{loading?"Leyendo eventos...":"Leer eventos del calendario →"}</button>
-        </div>}
+        </div>
       </div>}
 
-      {/* PASO 3 — Preview y edición */}
-      {step===3&&<div>
+      {/* PASO 2 — Preview */}
+      {step===2&&<div>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
-          <div><div style={{fontSize:"14px",fontWeight:600}}>Eventos encontrados: {parsed.length}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>{parsed.filter(p=>p.incluir).length} seleccionados para importar · Sucursal: {session.nombre}</div></div>
+          <div><div style={{fontSize:"14px",fontWeight:600}}>{parsed.length} eventos en {fileName}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)"}}>{parsed.filter(p=>p.incluir).length} seleccionados · 🟢 {completadas} completadas · 🔵 {agendadas} por atender</div></div>
           <div style={{display:"flex",gap:"6px"}}><button className="btn-ghost" style={{fontSize:"10px",padding:"5px 10px"}} onClick={()=>toggleAll(true)}>✓ Todos</button><button className="btn-ghost" style={{fontSize:"10px",padding:"5px 10px"}} onClick={()=>toggleAll(false)}>✕ Ninguno</button></div>
         </div>
-        {/* Leyenda estados */}
-        <div style={{display:"flex",gap:"12px",marginBottom:"12px",fontSize:"10px",color:"rgba(255,255,255,0.3)"}}>
-          <span>🟢 Completada (pasada)</span><span>🔵 Agendada (futura)</span><span style={{color:"rgba(255,255,255,0.15)"}}>Click en cualquier campo para editar</span>
-        </div>
-        <div style={{maxHeight:"400px",overflowY:"auto",border:"1px solid rgba(255,255,255,0.06)",borderRadius:"10px"}}>
-          <div style={{display:"grid",gridTemplateColumns:"36px 1fr 1fr 70px 50px 50px 70px",padding:"8px 12px",borderBottom:"1px solid rgba(255,255,255,0.08)",position:"sticky",top:0,background:"#0C0D1A",zIndex:2}}>
-            {["","Nombre","Servicio","Fecha","Ses","Total","Estado"].map(h=><div key={h} style={{fontSize:"9px",letterSpacing:"1px",color:"rgba(255,255,255,0.25)"}}>{h}</div>)}
+        <div style={{fontSize:"10px",color:"rgba(255,255,255,0.15)",marginBottom:"8px"}}>Puedes editar nombre, servicio, sesión y total antes de importar</div>
+        <div style={{maxHeight:"420px",overflowY:"auto",border:"1px solid rgba(255,255,255,0.06)",borderRadius:"10px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"36px 1fr 1fr 78px 46px 46px 76px",padding:"8px 12px",borderBottom:"1px solid rgba(255,255,255,0.08)",position:"sticky",top:0,background:"#0C0D1A",zIndex:2}}>
+            {["","Nombre","Servicio","Fecha","Ses","Tot","Estado"].map(h=><div key={h} style={{fontSize:"9px",letterSpacing:"1px",color:"rgba(255,255,255,0.25)"}}>{h}</div>)}
           </div>
-          {parsed.map(p=><div key={p.id} style={{display:"grid",gridTemplateColumns:"36px 1fr 1fr 70px 50px 50px 70px",padding:"6px 12px",borderBottom:"1px solid rgba(255,255,255,0.03)",opacity:p.incluir?1:0.3,alignItems:"center"}}>
+          {parsed.map(p=><div key={p.id} style={{display:"grid",gridTemplateColumns:"36px 1fr 1fr 78px 46px 46px 76px",padding:"5px 12px",borderBottom:"1px solid rgba(255,255,255,0.03)",opacity:p.incluir?1:0.25,alignItems:"center"}}>
             <input type="checkbox" checked={p.incluir} onChange={()=>toggleEvento(p.id)} style={{width:"14px",height:"14px",cursor:"pointer",accentColor:"#2721E8"}}/>
-            <input value={p.nombre} onChange={e=>editEvento(p.id,"nombre",e.target.value)} style={{background:"transparent",border:"none",color:"#fff",fontSize:"12px",fontWeight:500,outline:"none",padding:"4px 0",width:"100%"}}/>
-            <input value={p.servicio} onChange={e=>editEvento(p.id,"servicio",e.target.value)} style={{background:"transparent",border:"none",color:"rgba(255,255,255,0.6)",fontSize:"11px",outline:"none",padding:"4px 0",width:"100%"}}/>
-            <div style={{fontSize:"10px",color:"rgba(255,255,255,0.4)"}}>{new Date(p.fecha+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"short"})}</div>
-            <input type="number" value={p.sesNum} onChange={e=>editEvento(p.id,"sesNum",parseInt(e.target.value)||1)} style={{background:"transparent",border:"none",color:"#49B8D3",fontSize:"12px",fontWeight:600,outline:"none",width:"30px",textAlign:"center"}}/>
-            <input type="number" value={p.totalSes} onChange={e=>editEvento(p.id,"totalSes",parseInt(e.target.value)||8)} style={{background:"transparent",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"12px",outline:"none",width:"30px",textAlign:"center"}}/>
+            <input value={p.nombre} onChange={e=>editEvento(p.id,"nombre",e.target.value)} style={{background:"transparent",border:"none",color:"#fff",fontSize:"12px",fontWeight:500,outline:"none",padding:"4px 4px 4px 0",width:"100%"}}/>
+            <input value={p.servicio} onChange={e=>editEvento(p.id,"servicio",e.target.value)} style={{background:"transparent",border:"none",color:"rgba(255,255,255,0.5)",fontSize:"11px",outline:"none",padding:"4px 4px 4px 0",width:"100%"}}/>
+            <div style={{fontSize:"10px",color:"rgba(255,255,255,0.4)"}}>{new Date(p.fecha+"T12:00:00").toLocaleDateString("es-MX",{day:"numeric",month:"short",year:"2-digit"})}</div>
+            <input type="number" value={p.sesNum} onChange={e=>editEvento(p.id,"sesNum",parseInt(e.target.value)||1)} min="1" style={{background:"transparent",border:"none",color:"#49B8D3",fontSize:"12px",fontWeight:600,outline:"none",width:"28px",textAlign:"center"}}/>
+            <input type="number" value={p.totalSes} onChange={e=>editEvento(p.id,"totalSes",parseInt(e.target.value)||8)} min="1" style={{background:"transparent",border:"none",color:"rgba(255,255,255,0.3)",fontSize:"11px",outline:"none",width:"28px",textAlign:"center"}}/>
             <div style={{fontSize:"10px",fontWeight:600,color:p.estado==="completada"?"#10b981":"#49B8D3"}}>{p.estado==="completada"?"✓ Hecha":"📅 Agendada"}</div>
           </div>)}
         </div>
         <div style={{display:"flex",gap:"10px",marginTop:"16px"}}>
-          <button className="btn-ghost" style={{flex:1}} onClick={()=>setStep(2)}>← Atrás</button>
-          <button className="btn-blue" style={{flex:2,padding:"13px",fontSize:"14px"}} onClick={importar} disabled={importing||parsed.filter(p=>p.incluir).length===0}>{importing?"Importando...":"✓ Importar "+parsed.filter(p=>p.incluir).length+" eventos"}</button>
+          <button className="btn-ghost" style={{flex:1}} onClick={()=>{setStep(1);setParsed([]);setFileName("");}}>← Otro archivo</button>
+          <button className="btn-blue" style={{flex:2,padding:"13px",fontSize:"14px"}} onClick={importar} disabled={importing||parsed.filter(p=>p.incluir).length===0}>{importing?"Importando...":"✓ Importar "+parsed.filter(p=>p.incluir).length+" eventos a "+session.nombre}</button>
         </div>
       </div>}
 
-      {/* PASO 4 — Resultado */}
-      {step===4&&result&&<div style={{textAlign:"center",padding:"40px 20px"}}>
+      {/* PASO 3 — Resultado */}
+      {step===3&&result&&<div style={{textAlign:"center",padding:"40px 20px"}}>
         <div style={{fontSize:"48px",marginBottom:"16px"}}>🎉</div>
         <div style={{fontSize:"18px",fontWeight:700,marginBottom:"8px"}}>¡Importación completada!</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"14px",marginTop:"24px",maxWidth:"500px",margin:"24px auto"}}>
+        <div style={{fontSize:"13px",color:"rgba(255,255,255,0.4)",marginBottom:"24px"}}>{fileName} → {session.nombre}</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"14px",maxWidth:"500px",margin:"0 auto 24px"}}>
           {[{l:"Clientas creadas",v:result.clientas,c:"#10b981"},{l:"Paquetes creados",v:result.paquetes,c:"#49B8D3"},{l:"Citas importadas",v:result.citas,c:"#2721E8"}].map(k=><div key={k.l} className="glass" style={{padding:"16px",textAlign:"center"}}><div style={{fontSize:"28px",fontWeight:700,color:k.c}}>{k.v}</div><div style={{fontSize:"11px",color:"rgba(255,255,255,0.3)",marginTop:"4px"}}>{k.l}</div></div>)}
         </div>
-        {result.errores>0&&<div style={{fontSize:"12px",color:"#ff6b6b",marginTop:"12px"}}>⚠ {result.errores} errores durante la importación</div>}
-        <div style={{display:"flex",gap:"10px",justifyContent:"center",marginTop:"24px"}}>
-          <button className="btn-ghost" onClick={()=>{setStep(2);setParsed([]);setEvents([]);setResult(null);}}>Importar otro calendario</button>
-          <button className="btn-blue" style={{padding:"12px 24px"}} onClick={()=>{setStep(1);setToken(null);setCalendars([]);setSelCal(null);setParsed([]);setEvents([]);setResult(null);}}>✓ Terminado</button>
+        {result.errores>0&&<div style={{fontSize:"12px",color:"#ff6b6b",marginBottom:"12px"}}>⚠ {result.errores} errores</div>}
+        <div style={{display:"flex",gap:"10px",justifyContent:"center"}}>
+          <button className="btn-ghost" onClick={()=>{setStep(1);setParsed([]);setFileName("");setResult(null);}}>Importar otro archivo</button>
         </div>
       </div>}
     </div>
