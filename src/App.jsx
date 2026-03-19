@@ -692,18 +692,18 @@ function CSVImport({session}){
         // Detect format: new consolidated (FECHA,SERVICIO,CONCEPTO,MONTO,FORMA_DE_PAGO,CLIENTE,TIPO_CLIENTA,...) 
         // or old format (SERVICIO,FECHA,MONTO,CONCEPTO,FORMA_DE_PAGO,CLIENTE,CAMPAÑA,...)
         const hdrFirst=(hdrLine[0]||"").toUpperCase();
-        let servicio,fechaRaw,monto,concepto,metodo,cliente,tipoClienta;
+        let servicio,fechaRaw,monto,concepto,metodo,cliente,tipoClienta,campana;
         if(hdrFirst.includes("FECHA")){
           // New consolidated format: FECHA,SERVICIO,CONCEPTO,MONTO,FORMA_DE_PAGO,CLIENTE,TIPO_CLIENTA
           fechaRaw=(p[0]||"").trim();servicio=(p[1]||"").trim();concepto=(p[2]||"").trim();
           monto=parseMontoVenta(p[3]);metodo=(p[4]||"").trim();cliente=(p[5]||"").trim();
-          tipoClienta=(p[6]||"").trim();
-          if(!["Nueva","Recompra","Recomendada"].includes(tipoClienta))tipoClienta=parseTipoClienteCSV(p[7]||"");
+          tipoClienta=(p[6]||"").trim();campana=(p[7]||"").trim();
+          if(!["Nueva","Recompra","Recomendada"].includes(tipoClienta))tipoClienta=parseTipoClienteCSV(campana);
         }else{
           // Old format: SERVICIO,FECHA,MONTO,CONCEPTO,FORMA_DE_PAGO,CLIENTE,CAMPAÑA
           servicio=(p[0]||"").trim();fechaRaw=(p[1]||"").trim();monto=parseMontoVenta(p[2]);
           concepto=(p[3]||"").trim();metodo=parseMetodoPago(p[4]);cliente=(p[5]||"").trim();
-          tipoClienta=parseTipoClienteCSV(p[6]||"");
+          campana=(p[6]||"").trim();tipoClienta=parseTipoClienteCSV(campana);
         }
         const fecha=parseFechaVenta(fechaRaw);
         if(!fecha){errs.push(`Fila ${i+1}: fecha no reconocida "${fechaRaw}"`);return null;}
