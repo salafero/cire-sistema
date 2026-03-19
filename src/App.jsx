@@ -696,7 +696,7 @@ function CSVImport({session}){
         const hora=(p[7]||"").trim();
         const recibo=(p[8]||"").trim();
         if(!fecha){errs.push(`Fila ${i+1}: fecha no reconocida "${fechaRaw}"`);return null;}
-        if(!monto){errs.push(`Fila ${i+1}: monto inválido "${p[2]}"`);return null;}
+        if(!monto)return null; // Skip rows without amount silently
         const tipoClienta=parseTipoClienteCSV(campana);
         return{id:`csv-${i}`,servicio,fecha,monto,concepto,metodo,cliente,campana,tipoClienta,hora,recibo,incluir:true};
       }).filter(Boolean);
